@@ -15,7 +15,7 @@ static struct idt_descriptor idt_create_descriptor(void *isr, uint8_t flags)
     struct idt_descriptor currentDescriptor;
     
     currentDescriptor.offset_1 = (uintptr_t)isr & 0xffff;
-    currentDescriptor.segment_selector = 0x08;
+    currentDescriptor.segment_selector = GDT_CODE_PL0 * sizeof(uint64_t);
     currentDescriptor.ist = 0;
     currentDescriptor.flags = flags;
     currentDescriptor.offset_2 = ((uintptr_t)isr >> 16) & 0xffff;
