@@ -60,7 +60,6 @@ struct GDTR
     uint64_t offset;
 } __attribute__((packed));
 
-uint64_t gdt_create_descriptor(uint32_t base, uint32_t limit, uint16_t flags);
 void gdt_initialize_gdtTable(void);
 void gdt_load(struct GDTR *addr);
 

@@ -1,10 +1,9 @@
 #include "gdt.h"
 #include <stdint.h>
 
-struct GDTR gdtr;
 uint64_t gdt_table[NUM_GDT_ENTRIES];
 
-uint64_t gdt_create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
+static uint64_t gdt_create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
 {
     uint64_t descriptor;
  
@@ -35,6 +34,8 @@ void gdt_initialize_gdtTable(void)
     gdt_table[GDT_USER_CS] = gdt_create_descriptor(0, 0, GDT_CODE_PL3);
     gdt_table[GDT_USER_DS] = gdt_create_descriptor(0, 0, GDT_DATA_PL3); 
 
+    // It's okay if the gdtr is saved on the stack since lgdt stores a copy of it
+    struct GDTR gdtr;
     gdtr.size = sizeof(gdt_table) - 1;
     gdtr.offset = (uint64_t) &gdt_table;
     gdt_load(&gdtr);
