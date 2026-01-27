@@ -4,6 +4,7 @@
 #include <limine.h>
 #include <hal/cpu.h>
 #include <hal/devices.h>
+#include <drivers/acpi.h>
 
 extern uint64_t limine_base_revision[];
 extern struct limine_framebuffer_request framebuffer_request;
@@ -35,16 +36,17 @@ void kmain(void) {
 
     hal_initialize_cpu();
     hal_initialize_devices();
+    if(!acpi_verify_rsdp(rsdp_request.response->address))
+    {
+        log_to_serial("[ERROR] The RSDP is invalid\n");
+        hal_hcf();
+    }
     
     // Note: we assume the framebuffer model is RGB with 32-bit pixels.
     for (size_t i = 0; i < 100; i++) {
         volatile uint32_t *fb_ptr = framebuffer->address;
         fb_ptr[i * (framebuffer->pitch / 4) + i] = 0xffffff;
     }
-
-    int a = 1;
-    int b = 0;
-    int c = a / b;
 
     // We're done, just hang...
     hal_hcf();
