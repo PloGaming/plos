@@ -7,6 +7,7 @@
 
 extern uint64_t limine_base_revision[];
 extern struct limine_framebuffer_request framebuffer_request;
+extern struct limine_rsdp_request rsdp_request;
 
 // The following will be our kernel's entry point.
 // If renaming kmain() to something else, make sure to change the
@@ -14,6 +15,12 @@ extern struct limine_framebuffer_request framebuffer_request;
 void kmain(void) {
     // Ensure the bootloader actually understands our base revision (see spec).
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
+        hal_hcf();
+    }
+
+    // Ensure we got the rsdp
+    if(rsdp_request.response == NULL)
+    {
         hal_hcf();
     }
 
