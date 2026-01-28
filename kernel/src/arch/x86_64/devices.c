@@ -1,10 +1,12 @@
 #include <stdint.h>
 #include <hal/devices.h>
 #include "drivers/serial.h"
+#include "drivers/pic.h"
 
 void hal_initialize_devices(void)
 {
     init_serial();
+    disable_pic();
 }
 
 // Prints a string to the serial output
