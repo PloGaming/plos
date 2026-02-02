@@ -40,5 +40,5 @@ void idt_initialize_idtTable(void)
     
     // Finally load the new idt
     idt_load(&idtr);
-    log_to_serial("[DEBUG] IDT loaded\n");
+    log_to_serial("[IDT] IDT loaded\n");
 }

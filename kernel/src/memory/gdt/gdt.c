@@ -43,5 +43,5 @@ void gdt_initialize_gdtTable(void)
     gdtr.offset = (uint64_t) &gdt_table;
     gdt_load(&gdtr);
 
-    log_to_serial("[DEBUG] GDT loaded\n");
+    log_to_serial("[GDT] GDT loaded\n");
 }

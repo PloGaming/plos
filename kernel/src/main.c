@@ -8,7 +8,7 @@
 #include <interrupts/idt.h>
 #include <drivers/pic.h>
 #include <drivers/serial.h>
-#include <memory/ppm.h>
+#include <memory/pmm.h>
 #include <libk/string.h>
 
 extern uint64_t limine_base_revision[];
@@ -55,11 +55,7 @@ void kmain(void) {
     
     disable_pic();
 
-    // Because we're going to be freeing the memmap limine gave us
-    struct limine_memmap_response memmap;
-    memcpy(&memmap, memmap_request.response, sizeof(struct limine_memmap_response));
-
-    ppm_initialize(&memmap);
+    pmm_initialize(memmap_request.response);
 
     /*if(!acpi_set_correct_RSDT(rsdp_request.response->address))
     {
