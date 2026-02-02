@@ -137,4 +137,4 @@ clean:
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean:
-	rm -rf bin-* obj-* .deps-obtained .cache compile_commands.json cc-runtime limine-protocol
+	rm -rf bin obj .deps-obtained .cache compile_commands.json cc-runtime limine-protocol

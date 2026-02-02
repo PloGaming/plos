@@ -8,11 +8,14 @@
 #include <interrupts/idt.h>
 #include <drivers/pic.h>
 #include <drivers/serial.h>
+#include <memory/ppm.h>
+#include <libk/string.h>
 
 extern uint64_t limine_base_revision[];
 extern struct limine_framebuffer_request framebuffer_request;
 extern struct limine_rsdp_request rsdp_request;
 extern struct limine_hhdm_request hhdm_request;
+extern struct limine_memmap_request memmap_request;
 
 // The following will be our kernel's entry point.
 // If renaming kmain() to something else, make sure to change the
@@ -40,6 +43,11 @@ void kmain(void) {
     if (hhdm_request.response == NULL) {
         hcf();
     }
+
+    // Ensure we got the memmap.
+    if (memmap_request.response == NULL) {
+        hcf();
+    }
     
     init_serial();
     gdt_initialize_gdtTable();
@@ -47,11 +55,18 @@ void kmain(void) {
     
     disable_pic();
 
-    if(!acpi_set_correct_RSDT(rsdp_request.response->address))
+    // Because we're going to be freeing the memmap limine gave us
+    struct limine_memmap_response memmap;
+    memcpy(&memmap, memmap_request.response, sizeof(struct limine_memmap_response));
+
+    ppm_initialize(&memmap);
+
+    /*if(!acpi_set_correct_RSDT(rsdp_request.response->address))
     {
         log_to_serial("[ERROR] The RSDP is invalid\n");
         hcf();
     }
+    */
 
     // Fetch the first framebuffer.
     struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
