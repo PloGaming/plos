@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <memory/hhdm.h>
 #include <libk/string.h>
+#include <common/logging.h>
 
 uint8_t *pmm_bitmap = NULL;
 size_t pmm_bitmapSize = 0;
@@ -57,7 +58,7 @@ static void pmm_mark_region(uint64_t physStartAddr, uint64_t length, uint8_t reg
         pmm_mark_page(i, regionType);
     }
 
-    printf("[PMM] Marked region: 0x%x - 0x%x as %s\n", physStartAddr, endPhysAddr-1, 
+    log_logLine(LOG_DEBUG, "%s: Marked region: 0x%llx - 0x%llx as %s", __FUNCTION__, physStartAddr, endPhysAddr-1, 
         regionType == PMM_PAGE_FREE ? "FREE" : "OCCUPIED");
 }
 
@@ -106,7 +107,7 @@ void pmm_initialize(struct limine_memmap_response *memmap)
     // If no region is found we abort
     if(!pmm_bitmap)
     {
-        printf("[ERROR] Not enough memory for bitmap\n");
+        log_logLine(LOG_ERROR, "%s, Not enough memory for bitmap", __FUNCTION__);
         hcf();
     }
 
@@ -120,7 +121,7 @@ void pmm_initialize(struct limine_memmap_response *memmap)
         }
     }
 
-    printf("[PMM] PMM initialized: Bitmap size %lu bytes - Bitmap start virt addr 0x%lx\n", pmm_bitmapSize, pmm_bitmap);
+    log_logLine(LOG_SUCCESS, "%s: PMM initialized: Bitmap size %lu bytes - Bitmap start virt addr 0x%lx", __FUNCTION__, pmm_bitmapSize, pmm_bitmap);
 }
 
 // Allocates new memory and returns a physical address to the start of it

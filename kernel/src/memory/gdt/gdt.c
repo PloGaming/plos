@@ -1,3 +1,4 @@
+#include <common/logging.h>
 #include <stdint.h>
 #include <memory/gdt/gdt.h>
 #include <drivers/serial.h>
@@ -43,5 +44,5 @@ void gdt_initialize_gdtTable(void)
     gdtr.offset = (uint64_t) &gdt_table;
     gdt_load(&gdtr);
 
-    log_to_serial("[GDT] GDT loaded\n");
+    log_logLine(LOG_SUCCESS, "%s: GDT initialized", __FUNCTION__);
 }

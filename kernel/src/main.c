@@ -10,6 +10,7 @@
 #include <drivers/serial.h>
 #include <memory/pmm.h>
 #include <libk/string.h>
+#include <common/logging.h>
 
 extern uint64_t limine_base_revision[];
 extern struct limine_framebuffer_request framebuffer_request;
@@ -50,6 +51,7 @@ void kmain(void) {
     }
     
     init_serial();
+    log_init(LOG_SERIAL);
     gdt_initialize_gdtTable();
     idt_initialize_idtTable();
     

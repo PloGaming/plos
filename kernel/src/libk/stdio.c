@@ -306,9 +306,15 @@ int printf(char *fmt, ...)
 	int r;
 
 	va_start(ap, fmt);
-	r = simple_vsprintf(NULL, fmt, ap);
+	r = vprintf(fmt, ap);
 	va_end(ap);
 
+	return r;
+}
+
+int vprintf(char *fmt, va_list ap)
+{
+	int r = simple_vsprintf(NULL, fmt, ap);
 	return r;
 }
 

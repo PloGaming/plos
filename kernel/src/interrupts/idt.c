@@ -1,4 +1,4 @@
-#include <drivers/serial.h>
+#include <common/logging.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <interrupts/idt.h>
@@ -40,5 +40,5 @@ void idt_initialize_idtTable(void)
     
     // Finally load the new idt
     idt_load(&idtr);
-    log_to_serial("[IDT] IDT loaded\n");
+    log_logLine(LOG_SUCCESS, "%s: IDT initialized", __FUNCTION__);
 }
