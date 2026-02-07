@@ -10,8 +10,9 @@
 #include <libk/string.h>
 #include <common/logging.h>
 
-uint8_t *pmm_bitmap = NULL;
-size_t pmm_bitmapSize = 0;
+static uint8_t *pmm_bitmap = NULL;
+static size_t pmm_bitmapSize = 0;
+static uint64_t highestAddr = 0;
 
 // Marks a single page in the bitmap as free or used
 static void pmm_mark_page(uint64_t physAddr, uint8_t pageType)
@@ -57,25 +58,26 @@ static void pmm_mark_region(uint64_t physStartAddr, uint64_t length, uint8_t reg
     {
         pmm_mark_page(i, regionType);
     }
-
-    log_logLine(LOG_DEBUG, "%s: Marked region: 0x%llx - 0x%llx as %s", __FUNCTION__, physStartAddr, endPhysAddr-1, 
-        regionType == PMM_PAGE_FREE ? "FREE" : "OCCUPIED");
 }
 
 // Initialize the bitmap and its size
 void pmm_initialize(struct limine_memmap_response *memmap)
 {
-    uint64_t highestAddr = 0;
-
-    // Iterate the memory map
+    // Find the highest usable RAM address
     for(size_t i = 0; i < memmap->entry_count; i++)
     {
         struct limine_memmap_entry *entry = memmap->entries[i];
-        if(entry->type == LIMINE_MEMMAP_USABLE)
+        switch(entry->type)
         {
-            // Find the highest usable RAM address
-            uint64_t newAddr = entry->base + entry->length;
-            if(newAddr > highestAddr) highestAddr = newAddr;
+            case LIMINE_MEMMAP_USABLE:
+            case LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE:
+            case LIMINE_MEMMAP_EXECUTABLE_AND_MODULES:
+            case LIMINE_MEMMAP_FRAMEBUFFER:
+            case LIMINE_MEMMAP_ACPI_TABLES:
+            case LIMINE_MEMMAP_ACPI_RECLAIMABLE:
+            case LIMINE_MEMMAP_ACPI_NVS:            
+                highestAddr = entry->base + entry->length;
+                break;
         }
     }
 
@@ -184,4 +186,9 @@ uint64_t pmm_alloc(uint64_t size)
 void pmm_free(uint64_t physStartAddr, uint64_t length)
 {
     pmm_mark_region(physStartAddr, length, PMM_PAGE_FREE);
+}
+
+uint64_t pmm_getHighestAddr(void)
+{
+    return highestAddr;
 }

@@ -1,4 +1,7 @@
 #include <limine.h>
+#include <cpu.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 // Set the base revision to 4, this is recommended as this is the latest
 // base revision described by the Limine boot protocol specification.
@@ -36,6 +39,12 @@ volatile struct limine_memmap_request memmap_request = {
     .revision = 0
 };
 
+__attribute__((used, section(".limine_requests")))
+volatile struct limine_executable_address_request executable_addr_request = {
+    .id = LIMINE_EXECUTABLE_ADDRESS_REQUEST_ID,
+    .revision = 0
+};
+
 // Finally, define the start and end markers for the Limine requests.
 // These can also be moved anywhere, to any .c file, as seen fit.
 __attribute__((used, section(".limine_requests_start")))
@@ -43,3 +52,26 @@ volatile uint64_t limine_requests_start_marker[] = LIMINE_REQUESTS_START_MARKER;
 
 __attribute__((used, section(".limine_requests_end")))
 volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
+
+void limine_verify_requests()
+{
+    // Ensure the bootloader actually understands our base revision.
+    // And ensure we got every response
+    if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false ||
+        
+        rsdp_request.response == NULL ||
+        rsdp_request.response->address == NULL ||
+    
+        framebuffer_request.response == NULL ||
+        framebuffer_request.response->framebuffer_count < 1 ||
+    
+        hhdm_request.response == NULL ||
+    
+        memmap_request.response == NULL ||
+        memmap_request.response->entries == NULL ||
+    
+        executable_addr_request.response == NULL)
+    {
+        hcf();
+    }
+} 

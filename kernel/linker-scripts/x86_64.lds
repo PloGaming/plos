@@ -23,6 +23,8 @@ SECTIONS
     /* that is the beginning of the region. */
     . = 0xffffffff80000000;
 
+    _KERNEL_START = .;
+
     /* Define a section to contain the Limine requests and assign it to its own PHDR */
     .limine_requests : {
         KEEP(*(.limine_requests_start))
@@ -71,4 +73,6 @@ SECTIONS
         *(.eh_frame*)
         *(.note .note.*)
     }
+
+    _KERNEL_END = .;
 }

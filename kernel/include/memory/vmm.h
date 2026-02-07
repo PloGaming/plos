@@ -9,7 +9,7 @@
 
 // Flags for Page tables and directories
 #define PTE_FLAG_EXEC       (1ull << 63)
-#define PTE_FLAG_GLOABL     (1ull << 8)
+#define PTE_FLAG_GLOBAL     (1ull << 8)
 #define PTE_FLAG_PS         (1ull << 7)
 #define PTE_FLAG_PAT        (1ull << 7)
 #define PTE_FLAG_DIRTY      (1ull << 6)
@@ -30,5 +30,7 @@
 #define VMM_PTE_ADDR_MASK 0x000FFFFFFFFFF000
 
 void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, uint64_t flags, bool isHugePage);
+void vmm_init(void);
+inline void vmm_switchContext(uint64_t *kernel_pml4_phys);
 
 #endif // VMM_H

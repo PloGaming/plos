@@ -8,6 +8,13 @@
 #include <stdbool.h>
 #include <libk/string.h>
 
+extern struct limine_executable_address_request executable_addr_request;
+extern struct limine_hhdm_request hhdm_request;
+extern char _KERNEL_START;
+extern char _KERNEL_END;
+
+uint64_t *kernel_pml4_phys;
+
 // We are going to implement 4 level paging with 4kb pages
 
 /*
@@ -158,12 +165,65 @@ void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, u
 
     // Invalidate the corresponding tlb entry
     asm volatile("invlpg (%0)" :: "r" (virt_addr) : "memory");
-
-    log_logLine(LOG_SUCCESS, "%s: Page mapped successfully.\n\tvirt: %llx -> phys: %llx", virt_addr, phys_addr);
 }
 
 // This function should be called at the start to initialize the vmm
-void vmm_init()
+void vmm_init(void)
 {
+    // Allocate the kernel pml4
+    kernel_pml4_phys = (uint64_t *) pmm_alloc(VMM_PAGE_SIZE);
+    if(!kernel_pml4_phys)
+    {
+        log_logLine(LOG_ERROR, "%s: Cannot allocate the kernel PML4", __FUNCTION__);
+        hcf();
+    }
+    memset(hhdm_physToVirt((void *)kernel_pml4_phys), 0x00, VMM_PAGE_SIZE);
+    
+    log_logLine(LOG_DEBUG, "%s: Created the kernel_pml4_phys and zeroed it; physical address: 0x%llx", __FUNCTION__, kernel_pml4_phys);
 
+    // ************ Kernel mapping ****************
+    uint64_t virtual, physical;
+
+    uint64_t k_start, k_end, k_phys;
+    k_start = (uint64_t) &_KERNEL_START;
+    k_end = (uint64_t) &_KERNEL_END;
+    k_phys = executable_addr_request.response->physical_base;
+
+    // Map the kernel using normal pages
+    for(virtual = k_start, physical = k_phys; virtual < k_end; virtual += VMM_PAGE_SIZE, physical += VMM_PAGE_SIZE)
+    {
+        vmm_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, physical, PTE_FLAG_RW | PTE_FLAG_GLOBAL, false);
+    }
+
+    log_logLine(LOG_DEBUG, "%s: Kernel mapped\n\tvirtual range: 0x%llx - 0x%llx\n\tphysical range: 0x%llx - 0x%llx", __FUNCTION__, k_start, k_end, k_phys, physical);
+
+    // ************ HHDM mapping ****************
+
+    // Mapping all RAM to HHDM offset
+    uint64_t hhdm_offset = hhdm_request.response->offset;
+    uint64_t phys_highestAddr = pmm_getHighestAddr();
+
+    // Map the RAM using huge pages
+    for(virtual = hhdm_offset, physical = 0; physical < phys_highestAddr; virtual += VMM_HUGE_PAGE_SIZE, physical += VMM_HUGE_PAGE_SIZE)
+    {
+        vmm_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, physical, PTE_FLAG_RW | PTE_FLAG_GLOBAL, true);
+    }
+    log_logLine(LOG_DEBUG, "%s: RAM mapped \n\tvirtual range: 0x%llx - 0x%llx\n\tphysical range: 0x%llx, - 0x%llx", __FUNCTION__, hhdm_offset, virtual,  0ull, physical);
+
+    // We need to enable global pages
+    uint64_t cr4 = read_cr4();
+    if (!(cr4 & CR4_PGE_BIT)) 
+    {
+        cr4 |= CR4_PGE_BIT;
+        write_cr4(cr4);
+        log_logLine(LOG_DEBUG, "%s: CR4 Global Pages (PGE) Enabled", __FUNCTION__);
+    }
+
+    vmm_switchContext(kernel_pml4_phys);
+    log_logLine(LOG_SUCCESS, "%s: Switched to kernel pml4.", __FUNCTION__);
+}
+
+inline void vmm_switchContext(uint64_t *kernel_pml4_phys)
+{
+    asm volatile("mov %0, %%cr3" :: "r"(kernel_pml4_phys) : "memory");
 }

@@ -1,3 +1,4 @@
+#include <memory/vmm.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -11,6 +12,7 @@
 #include <memory/pmm.h>
 #include <libk/string.h>
 #include <common/logging.h>
+#include <limine_requests.h>
 
 extern uint64_t limine_base_revision[];
 extern struct limine_framebuffer_request framebuffer_request;
@@ -22,34 +24,9 @@ extern struct limine_memmap_request memmap_request;
 // If renaming kmain() to something else, make sure to change the
 // linker script accordingly.
 void kmain(void) {
-    // Ensure the bootloader actually understands our base revision .
-    if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
-        hcf();
-    }
 
-    // Ensure we got the rsdp
-    if(rsdp_request.response == NULL
-     || rsdp_request.response->address == NULL)
-    {
-        hcf();
-    }
+    limine_verify_requests();
 
-    // Ensure we got a framebuffer.
-    if (framebuffer_request.response == NULL
-     || framebuffer_request.response->framebuffer_count < 1) {
-        hcf();
-    }
-
-    // Ensure we got the hhdm.
-    if (hhdm_request.response == NULL) {
-        hcf();
-    }
-
-    // Ensure we got the memmap.
-    if (memmap_request.response == NULL) {
-        hcf();
-    }
-    
     init_serial();
     log_init(LOG_SERIAL);
     gdt_initialize_gdtTable();
@@ -58,6 +35,7 @@ void kmain(void) {
     disable_pic();
 
     pmm_initialize(memmap_request.response);
+    vmm_init();
 
     /*if(!acpi_set_correct_RSDT(rsdp_request.response->address))
     {

@@ -55,3 +55,15 @@ void cpu_cpuid(uint32_t leaf, uint32_t subleaf, uint32_t *eax, uint32_t *ebx, ui
     if (ecx) *ecx = rcx;
     if (edx) *edx = rdx;
 }
+
+inline uint64_t read_cr4() 
+{
+    uint64_t val;
+    asm volatile("mov %%cr4, %0" : "=r"(val));
+    return val;
+}
+
+inline void write_cr4(uint64_t val) 
+{
+    asm volatile("mov %0, %%cr4" :: "r"(val));
+}
