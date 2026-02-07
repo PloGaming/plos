@@ -1,3 +1,4 @@
+#include <memory/kheap.h>
 #include <memory/vmm.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -36,6 +37,7 @@ void kmain(void) {
 
     pmm_initialize(memmap_request.response);
     vmm_init();
+    kheap_init();
 
     /*if(!acpi_set_correct_RSDT(rsdp_request.response->address))
     {

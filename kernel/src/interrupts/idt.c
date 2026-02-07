@@ -6,7 +6,7 @@
 
 // Aligned for performance
 __attribute__((aligned(0x10))) 
-struct idt_descriptor idt[IDT_NUM_ENTRIES];
+static struct idt_descriptor idt[IDT_NUM_ENTRIES];
 
 // This is the array of ISR's function pointers
 extern void* isr_stub_table[];

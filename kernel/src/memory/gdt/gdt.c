@@ -5,7 +5,7 @@
 
 // Aligned for performance
 __attribute__((aligned(0x08))) 
-uint64_t gdt_table[NUM_GDT_ENTRIES];
+static uint64_t gdt_table[NUM_GDT_ENTRIES];
 
 static uint64_t gdt_create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
 {

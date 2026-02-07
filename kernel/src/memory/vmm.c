@@ -13,7 +13,7 @@ extern struct limine_hhdm_request hhdm_request;
 extern char _KERNEL_START;
 extern char _KERNEL_END;
 
-uint64_t *kernel_pml4_phys;
+static uint64_t *kernel_pml4_phys;
 
 // We are going to implement 4 level paging with 4kb pages
 
@@ -226,4 +226,9 @@ void vmm_init(void)
 inline void vmm_switchContext(uint64_t *kernel_pml4_phys)
 {
     asm volatile("mov %0, %%cr3" :: "r"(kernel_pml4_phys) : "memory");
+}
+
+uint64_t *vmm_getKernelRoot(void)
+{
+    return kernel_pml4_phys;
 }

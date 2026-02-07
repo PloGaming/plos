@@ -6,7 +6,7 @@
 #include <libk/string.h>
 
 static bool useXSDT = false;
-void* currentRSDT = NULL;
+static void* currentRSDT = NULL;
 
 static bool checksum_RSDP(uint8_t *byte_array, size_t size) {
     uint32_t sum = 0;
