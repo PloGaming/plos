@@ -8,7 +8,7 @@
 #define VMM_HUGE_PAGE_SIZE  0x200000
 
 // Flags for Page tables and directories
-#define PTE_FLAG_EXEC       (1ull << 63)
+#define PTE_FLAG_NO_EXEC    (1ull << 63)
 #define PTE_FLAG_GLOBAL     (1ull << 8)
 #define PTE_FLAG_PS         (1ull << 7)
 #define PTE_FLAG_PAT        (1ull << 7)

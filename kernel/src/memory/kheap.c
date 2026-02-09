@@ -96,7 +96,11 @@ bool kheap_extend(size_t size)
     return true;
 }
 
-// Our allocating function
+/* 
+    Our kernel heap allocating function
+    It allocates a virtually contiguos memory region 
+    above the mapping of the kernel
+*/
 void* kmalloc(size_t size)
 {
     // Align the size to 16 bytes
@@ -153,4 +157,9 @@ void* kmalloc(size_t size)
             return NULL;
         }
     }
+}
+
+void kfree(void *ptr)
+{
+    
 }

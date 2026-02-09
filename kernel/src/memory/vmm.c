@@ -10,32 +10,16 @@
 
 extern struct limine_executable_address_request executable_addr_request;
 extern struct limine_hhdm_request hhdm_request;
-extern char _KERNEL_START;
-extern char _KERNEL_END;
 
 static uint64_t *kernel_pml4_phys;
 
 // We are going to implement 4 level paging with 4kb pages
 
-/*
-    This function takes a virtual address and maps the page associated to it to the physical page 
-    associated with the physical address
-*/
-void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, uint64_t flags, bool isHugePage)
+static uint64_t* vmm_get_pte(uint64_t *pml4_root, uint64_t virt_addr, bool allocate, bool is_huge)
 {
     // We align the addresses to a 4096 boundary
     if(virt_addr % VMM_PAGE_SIZE)
         virt_addr -= virt_addr % VMM_PAGE_SIZE;
-
-    if(phys_addr % PMM_PAGE_SIZE)
-        phys_addr -= phys_addr % PMM_PAGE_SIZE;
-
-    // The root MUST point to a valid address and we won't map to page zero
-    if(!pml4_root || !virt_addr)
-    {
-        log_logLine(LOG_ERROR, "%s: Error address invalid", __FUNCTION__);
-        hcf();
-    }
 
     uint64_t pml4Index, pdprIndex, pdIndex, ptIndex;
 
@@ -44,52 +28,40 @@ void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, u
     pdprIndex = VMM_GET_PDPRINDEX(virt_addr);
     pdIndex = VMM_GET_PDINDEX(virt_addr);
     ptIndex = VMM_GET_PTINDEX(virt_addr);
-    
+
     // ************************ PML4 -> PDPR ******************************
     uint64_t *virtual_pdpr;
-    // If the pml4 entry doesn't exist we must create it
+
     if(!(pml4_root[pml4Index] & PTE_FLAG_PRESENT))
     {
+        if(!allocate) return NULL;
+        
         // We allocate a new page for our new pdpr
         uint64_t phys_new_pdpr = pmm_alloc(VMM_PAGE_SIZE);
-        if(!phys_new_pdpr)
-        {
-            log_logLine(LOG_ERROR, "%s: Error while allocating PDPR page", __FUNCTION__);
-            hcf();
-        }
+        if(!phys_new_pdpr) return NULL;
 
         virtual_pdpr = hhdm_physToVirt((void *)phys_new_pdpr);
 
         // We have to set it to zero
         memset(virtual_pdpr, 0x00, VMM_PAGE_SIZE);
 
-        // We set the directory entry as present, readable and writable by all 
-        pml4_root[pml4Index] = phys_new_pdpr | PTE_FLAG_PRESENT | PTE_FLAG_RW;
-        
-        // If the page is accessible by the user then also the previous directory need to have this flag
-        if(flags & PTE_FLAG_US)
-        {
-            pml4_root[pml4Index] |= PTE_FLAG_US;
-        }
-    }
-    else 
-    {
-        // else we get the addr and convert it using hhdm
-        virtual_pdpr = hhdm_physToVirt((void *)(pml4_root[pml4Index] & VMM_PTE_ADDR_MASK));
+        // We set the directory entry as present, readable and writable by all
+        pml4_root[pml4Index] = phys_new_pdpr | PTE_FLAG_US | PTE_FLAG_PRESENT | PTE_FLAG_RW;
     }
 
+    // we get the addr and convert it using hhdm
+    virtual_pdpr = hhdm_physToVirt((void *)(pml4_root[pml4Index] & VMM_PTE_ADDR_MASK));
+    
     // ************************ PDPR -> PD ********************************
     uint64_t *virtual_pd;
-    // If the pdpr entry doesn't exist we must create it
+
     if(!(virtual_pdpr[pdprIndex] & PTE_FLAG_PRESENT))
     {
+        if(!allocate) return NULL;
+
         // We allocate a new page for our new pd
         uint64_t phys_new_pd = pmm_alloc(VMM_PAGE_SIZE);
-        if(!phys_new_pd)
-        {
-            log_logLine(LOG_ERROR, "%s: Error while allocating PD page", __FUNCTION__);
-            hcf();
-        }
+        if(!phys_new_pd) return NULL;
 
         virtual_pd = hhdm_physToVirt((void *)phys_new_pd);
 
@@ -97,21 +69,44 @@ void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, u
         memset(virtual_pd, 0x00, VMM_PAGE_SIZE);
 
         // We set the directory entry as present, readable and writable by all 
-        virtual_pdpr[pdprIndex] = phys_new_pd | PTE_FLAG_PRESENT | PTE_FLAG_RW;
-        
-        // If the page is accessible by the user then also the previous directory need to have this flag
-        if(flags & PTE_FLAG_US)
-        {
-            virtual_pdpr[pdprIndex] |= PTE_FLAG_US;
-        }
+        virtual_pdpr[pdprIndex] = phys_new_pd | PTE_FLAG_US | PTE_FLAG_PRESENT | PTE_FLAG_RW;
     }
-    else 
+    // else we get the addr and convert it using hhdm
+    virtual_pd = hhdm_physToVirt((void *)(virtual_pdpr[pdprIndex] & VMM_PTE_ADDR_MASK));
+    
+    // If the page is huge we stop here
+    if(is_huge) return &virtual_pd[pdIndex];
+
+    // ************************ PD -> PT ********************************
+    uint64_t *virtual_pt;
+    // If the pd entry doesn't exist we must create it
+    if(!(virtual_pd[pdIndex] & PTE_FLAG_PRESENT))
     {
-        // else we get the addr and convert it using hhdm
-        virtual_pd = hhdm_physToVirt((void *)(virtual_pdpr[pdprIndex] & VMM_PTE_ADDR_MASK));
+        if(!allocate) return NULL;
+
+        // We allocate a new page for our new pt
+        uint64_t phys_new_pt = pmm_alloc(VMM_PAGE_SIZE);
+        if(!phys_new_pt) return NULL;
+
+        virtual_pt = hhdm_physToVirt((void *)phys_new_pt);
+
+        // We have to set it to zero
+        memset(virtual_pt, 0x00, VMM_PAGE_SIZE);
+
+        // We set the directory entry as present, readable and writable by all 
+        virtual_pd[pdIndex] = phys_new_pt | PTE_FLAG_US | PTE_FLAG_PRESENT | PTE_FLAG_RW;
     }
 
-    // If the request is a huge page then we map it directly to the page directory
+    virtual_pt = hhdm_physToVirt((void *)(virtual_pd[pdIndex] & VMM_PTE_ADDR_MASK));
+    return &virtual_pt[ptIndex];
+}
+
+/*
+    This function takes a virtual address and maps the page associated to it to the physical page 
+    associated with the physical address
+*/
+void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, uint64_t flags, bool isHugePage)
+{
     if(isHugePage)
     {
         // We align the addresses to a 2MB boundary
@@ -120,48 +115,34 @@ void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, u
 
         if(phys_addr % VMM_HUGE_PAGE_SIZE)
             phys_addr -= phys_addr % VMM_HUGE_PAGE_SIZE;
-
-        // Set the entry with the huge flag
-        virtual_pd[pdIndex] = phys_addr | flags| PTE_FLAG_PRESENT | PTE_FLAG_PS;
     }
     else 
     {
-        // ************************ PD -> PT ********************************
-        uint64_t *virtual_pt;
-        // If the pd entry doesn't exist we must create it
-        if(!(virtual_pd[pdIndex] & PTE_FLAG_PRESENT))
-        {
-            // We allocate a new page for our new pt
-            uint64_t phys_new_pt = pmm_alloc(VMM_PAGE_SIZE);
-            if(!phys_new_pt)
-            {
-                log_logLine(LOG_ERROR, "%s: Error while allocating PT page", __FUNCTION__);
-                hcf();
-            }
+        // We align the addresses to a 4096 boundary
+        if(virt_addr % VMM_PAGE_SIZE)
+            virt_addr -= virt_addr % VMM_PAGE_SIZE;
 
-            virtual_pt = hhdm_physToVirt((void *)phys_new_pt);
-
-            // We have to set it to zero
-            memset(virtual_pt, 0x00, VMM_PAGE_SIZE);
-
-            // We set the directory entry as present, readable and writable by all 
-            virtual_pd[pdIndex] = phys_new_pt | PTE_FLAG_PRESENT | PTE_FLAG_RW;
-            
-            // If the page is accessible by the user then also the previous directory need to have this flag
-            if(flags & PTE_FLAG_US)
-            {
-                virtual_pd[pdIndex] |= PTE_FLAG_US;
-            }
-        }
-        else 
-        {
-            // else we get the addr and convert it using hhdm
-            virtual_pt = hhdm_physToVirt((void *)(virtual_pd[pdIndex] & VMM_PTE_ADDR_MASK));
-        }
-
-        // Here we write the corresponding page frame number to the page table
-        virtual_pt[ptIndex] = phys_addr | flags | PTE_FLAG_PRESENT;
+        if(phys_addr % PMM_PAGE_SIZE)
+            phys_addr -= phys_addr % PMM_PAGE_SIZE;
     }
+    
+    // The root MUST point to a valid address and we won't map to page zero
+    if(!pml4_root || !virt_addr)
+    {
+        log_logLine(LOG_ERROR, "%s: Error address invalid", __FUNCTION__);
+        hcf();
+    }
+
+    // Allocate the page tables
+    uint64_t *pte = vmm_get_pte(hhdm_physToVirt(pml4_root), virt_addr, true, isHugePage);
+    if(!pte)
+    {
+        log_logLine(LOG_ERROR, "%s: Cannot map new page %llx: OOP", __FUNCTION__, virt_addr);
+        hcf();
+    }
+
+    // Set the new page table entry
+    *pte = phys_addr | flags | PTE_FLAG_PRESENT | (isHugePage ? PTE_FLAG_PS : 0);
 
     // Invalidate the corresponding tlb entry
     asm volatile("invlpg (%0)" :: "r" (virt_addr) : "memory");
@@ -181,21 +162,58 @@ void vmm_init(void)
     
     log_logLine(LOG_DEBUG, "%s: Created the kernel_pml4_phys and zeroed it; physical address: 0x%llx", __FUNCTION__, kernel_pml4_phys);
 
+    
     // ************ Kernel mapping ****************
     uint64_t virtual, physical;
 
-    uint64_t k_start, k_end, k_phys;
-    k_start = (uint64_t) &_KERNEL_START;
-    k_end = (uint64_t) &_KERNEL_END;
-    k_phys = executable_addr_request.response->physical_base;
+    // Import the linker script symbols
+    extern char _KERNEL_START, _KERNEL_END, 
+        _LIMINE_REQUESTS_START, _LIMINE_REQUESTS_END,
+        _TEXT_START, _TEXT_END,
+        _RODATA_START, _RODATA_END,
+        _DATA_START, _DATA_END;
 
-    // Map the kernel using normal pages
-    for(virtual = k_start, physical = k_phys; virtual < k_end; virtual += VMM_PAGE_SIZE, physical += VMM_PAGE_SIZE)
+    uint64_t k_phys = executable_addr_request.response->physical_base;
+    
+    // Map the limine requests segment (Read + Write)
+    uint64_t pte_flags = PTE_FLAG_RW | PTE_FLAG_NO_EXEC | PTE_FLAG_GLOBAL;
+    for(virtual = (uint64_t)&_LIMINE_REQUESTS_START; virtual <= (uint64_t)&_LIMINE_REQUESTS_END; virtual += VMM_PAGE_SIZE)
     {
-        vmm_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, physical, PTE_FLAG_RW | PTE_FLAG_GLOBAL, false);
+        uint64_t offset = virtual - (uint64_t) &_KERNEL_START;
+        vmm_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, k_phys + offset, pte_flags, false);
     }
+    log_logLine(LOG_DEBUG, "%s: limine requests mapped\n\tvirtual range: 0x%llx - 0x%llx", 
+        __FUNCTION__, &_LIMINE_REQUESTS_START, &_LIMINE_REQUESTS_END);
+    
+    // Map the code segment (Read + Exec)
+    pte_flags = PTE_FLAG_GLOBAL;
+    for(virtual = (uint64_t)&_TEXT_START; virtual <= (uint64_t)&_TEXT_END; virtual += VMM_PAGE_SIZE)
+    {
+        uint64_t offset = virtual - (uint64_t) &_KERNEL_START;
+        vmm_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, k_phys + offset, pte_flags, false);
+    }
+    log_logLine(LOG_DEBUG, "%s: Code segment mapped\n\tvirtual range: 0x%llx - 0x%llx", 
+        __FUNCTION__, &_TEXT_START, &_TEXT_END);
 
-    log_logLine(LOG_DEBUG, "%s: Kernel mapped\n\tvirtual range: 0x%llx - 0x%llx\n\tphysical range: 0x%llx - 0x%llx", __FUNCTION__, k_start, k_end, k_phys, physical);
+    // Map the rodata segment (Read)
+    pte_flags = PTE_FLAG_NO_EXEC | PTE_FLAG_GLOBAL;
+    for(virtual = (uint64_t)&_RODATA_START; virtual <= (uint64_t)&_RODATA_END; virtual += VMM_PAGE_SIZE)
+    {
+        uint64_t offset = virtual - (uint64_t) &_KERNEL_START;
+        vmm_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, k_phys + offset, pte_flags, false);
+    }
+    log_logLine(LOG_DEBUG, "%s: Code segment mapped\n\tvirtual range: 0x%llx - 0x%llx", 
+        __FUNCTION__, &_RODATA_START, &_RODATA_END);
+
+    // Map the data segment (Read + Write)
+    pte_flags = PTE_FLAG_NO_EXEC | PTE_FLAG_RW | PTE_FLAG_GLOBAL;
+    for(virtual = (uint64_t)&_DATA_START; virtual <= (uint64_t)&_DATA_END; virtual += VMM_PAGE_SIZE)
+    {
+        uint64_t offset = virtual - (uint64_t) &_KERNEL_START;
+        vmm_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, k_phys + offset, pte_flags, false);
+    }
+    log_logLine(LOG_DEBUG, "%s: Code segment mapped\n\tvirtual range: 0x%llx - 0x%llx", 
+        __FUNCTION__, &_DATA_START, &_DATA_END);
 
     // ************ HHDM mapping ****************
 

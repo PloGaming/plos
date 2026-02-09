@@ -27,22 +27,27 @@ SECTIONS
 
     /* Define a section to contain the Limine requests and assign it to its own PHDR */
     .limine_requests : {
+        _LIMINE_REQUESTS_START = .;
         KEEP(*(.limine_requests_start))
         KEEP(*(.limine_requests))
         KEEP(*(.limine_requests_end))
+        _LIMINE_REQUESTS_END = .;
     } :limine_requests
 
     /* Move to the next memory page for .text */
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .text : {
+        _TEXT_START = .;
         *(.text .text.*)
+        _TEXT_END = .;
     } :text
 
     /* Move to the next memory page for .rodata */
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .rodata : {
+        _RODATA_START = .;
         *(.rodata .rodata.*)
     } :rodata
 
@@ -50,12 +55,14 @@ SECTIONS
     /* linker command. */
     .note.gnu.build-id : {
         *(.note.gnu.build-id)
+         _RODATA_END = .;
     } :rodata
 
     /* Move to the next memory page for .data */
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     .data : {
+        _DATA_START = .;
         *(.data .data.*)
     } :data
 
@@ -66,6 +73,7 @@ SECTIONS
     .bss : {
         *(.bss .bss.*)
         *(COMMON)
+        _DATA_END = .;
     } :data
 
     /* Discard .note.* and .eh_frame* since they may cause issues on some hosts. */
