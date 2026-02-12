@@ -37,12 +37,25 @@ void kmain(void) {
     paging_init();
     kheap_init();
 
+    void *a = kmalloc(100);
+    kheap_print_nodes();
+    void *b = kmalloc(100);
+    kheap_print_nodes();
+    void *c = kmalloc(100);
     kheap_print_nodes();
 
-    kmalloc(0x300000);
+    // Heap: [A][B][C]...
 
+    kfree(a); 
     kheap_print_nodes();
-    pmm_dump_state();
+    // Heap: [Free][B][C]...
+
+    kfree(c);
+    kheap_print_nodes();
+    // Heap: [Free][B][Free]...
+
+    kfree(b);
+    kheap_print_nodes();
 
     if(!acpi_set_correct_RSDT())
     {

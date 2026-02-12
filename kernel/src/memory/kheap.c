@@ -113,20 +113,16 @@ void* kmalloc(size_t size)
     {
         currentNode = kheap_head;
 
-        log_log_line(LOG_DEBUG, "a");
 
         // Iterate the list of free nodes
         while(currentNode != NULL)
         {
-            log_log_line(LOG_DEBUG, "b");
             // We found a free and big enough block
             if(currentNode->isFree && currentNode->size >= size)
             {
-                log_log_line(LOG_DEBUG, "c");
                 // If the remaining size is enough for another big enough block we split it
                 if(currentNode->size - size >= sizeof(struct kheap_node) + KHEAP_MIN_SPLITTING_SIZE)
                 {
-                    log_log_line(LOG_DEBUG, "d");
                     struct kheap_node *newNode = (struct kheap_node *)((uint8_t *)currentNode + sizeof(struct kheap_node) + size);
                 
                     // Change the next node for both nodes
@@ -141,21 +137,16 @@ void* kmalloc(size_t size)
                     currentNode->size = size;
                 }
 
-                log_log_line(LOG_DEBUG, "e");
                 currentNode->isFree = false;
                 return (void *)(currentNode + 1);
             }
 
-            log_log_line(LOG_DEBUG, "f");
             // We go to the next node
             currentNode = currentNode->next;
         }
-
-        log_log_line(LOG_DEBUG, "g");
         // If we're here it's because we didn't find a big enough block
         if(!kheap_extend(KHEAP_EXTENDING_AMOUNT))
         {
-            log_log_line(LOG_DEBUG, "h");
             // The heap expansion has failed
             return NULL;
         }
@@ -177,10 +168,50 @@ void kheap_print_nodes()
     }
 }
 
+// This function tries to coalesce near free blocks, 
+// useful to combat external fragmentation
+static void kheap_coalesce()
+{
+    struct kheap_node *current = kheap_head;
+    while(current != NULL && current->next != NULL)
+    {
+        // If 2 consecutive blocks are free then we merge them
+        if(current->isFree && current->next->isFree)
+        {
+            // Increment the size of the previous node
+            current->size += current->next->size + sizeof(struct kheap_node);
+
+            // We remove the 2nd node from the list
+            current->next = current->next->next;
+        }
+        else 
+        {
+            // We advance only if we didn't merge anything
+            current = current->next;
+        }
+    }
+}
+
 /* 
     Our kernel heap deallocator function
 */
 void kfree(void *ptr)
 {
+    if(!ptr) return;
+
+    // Get the header
+    struct kheap_node *node_to_free = (struct kheap_node *)ptr - 1;
     
+    // Check for double free
+    if(node_to_free->isFree)
+    {
+        log_log_line(LOG_WARN, "%s: Kernel heap double free detected; virtual addr: 0x%llx", __FUNCTION__, ptr);
+        return;
+    }
+
+    // Set the node as free
+    node_to_free->isFree = true;
+
+    // Coalesce the blocks to reduce external fragmentation
+    kheap_coalesce();
 }
