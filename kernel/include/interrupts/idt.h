@@ -31,12 +31,11 @@ struct idt_descriptor
  */
 struct idtr
 {
-    uint16_t size; ///< How bug is the table - 1
+    uint16_t size; ///< How big is the table - 1
     uintptr_t offset; ///< Where to find the table
 } __attribute__((packed));
 
 extern void idt_load(struct idtr* idtr);
 void idt_init(void);
-void idt_set_descriptor(uint8_t vector, void *isr, uint8_t flags);
 
 #endif // IDT_H

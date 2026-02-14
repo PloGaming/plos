@@ -9,7 +9,6 @@
 #include <drivers/acpi.h>
 #include <memory/gdt/gdt.h>
 #include <interrupts/idt.h>
-#include <drivers/pic.h>
 #include <drivers/serial.h>
 #include <memory/pmm.h>
 #include <libk/string.h>
@@ -28,8 +27,6 @@ void kmain(void) {
     
     gdt_init();
     idt_init();
-    
-    pic_disable();
 
     pmm_printUsableRegions();
     pmm_init();

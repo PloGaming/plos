@@ -16,7 +16,18 @@ static uint64_t *kernel_pml4_phys;
 
 // We are going to implement 4 level paging with 4kb pages
 
-//This function will return the page table entry
+/**
+ * @brief This function will return the page table entry associated with the virtual address
+ * This function is very flexible because it can return an already existing pte OR allocate it
+ * if it doens't exist
+ * @param pml4_root The virtual address of the pml4 root, necessary because there can be many VAS
+ * @param virt_addr The virtual address belonging to the page that we want to return and/or allocate
+ * @param allocate If true then we allocate the page if non present and also intermediete page tables
+ * @param is_huge If true then the virtual address belongs to a huge page (2MB)
+ * @return uint64_t* the virtual address (HHDM) of the page table entry or NULL. If allocate = false then
+ * the pte isn't present. If allocate = true then there was a problem allocating it
+ * @note virt_addr does not have to be aligned to a page boundary
+ */
 static uint64_t* vmm_get_pte(uint64_t *pml4_root, uint64_t virt_addr, bool allocate, bool is_huge)
 {
     // We align the addresses to a 4096 boundary
@@ -103,10 +114,16 @@ static uint64_t* vmm_get_pte(uint64_t *pml4_root, uint64_t virt_addr, bool alloc
     return &virtual_pt[ptIndex];
 }
 
-/*
-    This function takes a virtual address and maps the page associated to it to the physical page 
-    associated with the physical address
-*/
+/**
+ * @brief This function takes a virtual address and maps the page associated to it to the physical page associated with the physical address
+ * 
+ * @param pml4_root The virtual address of the pml4 root, necessary because there can be many VAS
+ * @param virt_addr The virtual address belonging to the page that we want to map to
+ * @param phys_addr The physical address belonging to the frame that we want to map from
+ * @param flags x86_64 page flags
+ * @param isHugePage If true then the virtual address belongs to a huge page (2MB)
+ * @note virt_addr and phys_addr do not have to be aligned to a page boundary
+ */
 void paging_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, uint64_t flags, bool isHugePage)
 {
     // We align the addresses to a 2MB boundary
@@ -138,7 +155,15 @@ void paging_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr
     asm volatile("invlpg (%0)" :: "r" (virt_addr) : "memory");
 }
 
-// Unmaps a page from the virtual address space
+/**
+ * @brief Unmaps a page from the virtual address space
+ * Marks the page table entry as invalid by masking off the present (P) bit
+ * @param pml4_root The virtual address of the pml4 root, necessary because there can be many VAS
+ * @param virt_addr The virtual address belonging to the page that we want to unmap
+ * @param isHugePage If true then the virtual address belongs to a huge page (2MB)
+ * @note After the unmapping it decrements the number of references to the physical page
+ * @note virt_addr does not have to be aligned to a page boundary
+ */
 void paging_unmap_page(uint64_t *pml4_root, uint64_t virt_addr, bool isHugePage)
 {
     if(!pml4_root || !virt_addr)
@@ -160,8 +185,16 @@ void paging_unmap_page(uint64_t *pml4_root, uint64_t virt_addr, bool isHugePage)
     pmm_page_dec_ref(physAddr);    
 }
 
-// This function changes the flags of the corresponding pte
-// only if the page is marked present
+/**
+ * @brief This function changes the flags of the corresponding pte
+ * 
+ * @param pml4_root The virtual address of the pml4 root, necessary because there can be many VAS
+ * @param virt_addr The virtual address belonging to the page that we want to unmap
+ * @param flags The new flags that will overwrite the old ones 
+ * @param isHugePage If true then the virtual address belongs to a huge page (2MB)
+ * @note works only if the page is marked present
+ * @note virt_addr does not have to be aligned to a page boundary
+ */
 void paging_change_page_flags(uint64_t *pml4_root, uint64_t virt_addr, uint64_t flags, bool isHugePage)
 {
     if(!pml4_root || !virt_addr)
@@ -180,7 +213,17 @@ void paging_change_page_flags(uint64_t *pml4_root, uint64_t virt_addr, uint64_t 
     asm volatile("invlpg (%0)" :: "r" (virt_addr) : "memory");
 }
 
-// This function maps a physically contiguos region into a virtually contiguos region
+/**
+ * @brief This function maps a physically contiguos region into a virtually contiguos one
+ * 
+ * @param pml4_root The virtual address of the pml4 root, necessary because there can be many VAS
+ * @param virt_addr The starting virtual address belonging to the first page that we want to map to
+ * @param phys_addr The starting physical address belonging to the first frame that we want to map from
+ * @param size The size of the region 
+ * @param flags The x86_64 flags for each page in the region
+ * @param isHugePage If true then the mapped pages are considered huge pages (2MB)
+ * @note virt_addr and phys_addr do not have to be aligned to a page boundary
+ */
 void paging_map_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, uint64_t size, uint64_t flags, bool isHugePage)
 {
     uint64_t virtual, physical;
@@ -194,6 +237,15 @@ void paging_map_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_ad
         __FUNCTION__, virt_addr, virtual, phys_addr, physical);
 }
 
+/**
+ * @brief This function unmaps a virtually contiguos region
+ * 
+ * @param pml4_root The virtual address of the pml4 root, necessary because there can be many VAS
+ * @param virt_addr The starting virtual address belonging to the first page that we want to map to
+ * @param size The size of the region 
+ * @param isHugePage If true then the mapped pages are considered huge pages (2MB)
+ * @note virt_addr does not have to be aligned to a page boundary
+ */
 void paging_unmap_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t size, bool isHugePage)
 {
     uint64_t virtual;
@@ -207,7 +259,15 @@ void paging_unmap_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t size,
         __FUNCTION__, virt_addr, virtual);
 }
 
-// This function should be called at the start to initialize the vmm
+/**
+ * @brief This function should be called at the start of the kernel to initialize the vmm.
+ * 1) It creates a new pml4 table for exclusive use by the kernel. 
+ * 2) Maps the following regions: limine_requests, text, rodata and data with the correct permissions
+ * at the KERNEL_START addr.
+ * 3) It maps all RAM into the hhdm region
+ * 4) It enables global pages
+ * 5) Finally switches to the pml4 we created before
+ */
 void paging_init(void)
 {
     // Allocate the kernel pml4
@@ -285,13 +345,21 @@ void paging_init(void)
     log_log_line(LOG_SUCCESS, "%s: Switched to kernel pml4.", __FUNCTION__);
 }
 
-// Switches the page table root by updating the cr3 register
-inline void paging_switch_context(uint64_t *kernel_pml4_phys)
+/**
+ * @brief Switches the page table root by updating the cr3 register
+ * 
+ * @param pml4_phys The physical address of the pml4 we want to switch to
+ */
+inline void paging_switch_context(uint64_t *pml4_phys)
 {
-    asm volatile("mov %0, %%cr3" :: "r"(kernel_pml4_phys) : "memory");
+    asm volatile("mov %0, %%cr3" :: "r"(pml4_phys) : "memory");
 }
 
-// Returns the physical address of the pointer to the pdl4 of the kernel
+/**
+ * @brief A getter for the physical address of the kernel pml4
+ * 
+ * @return uint64_t* It returns a pointer to the physical address of the kernel pml4
+ */
 uint64_t *paging_getKernelRoot(void)
 {
     return kernel_pml4_phys;

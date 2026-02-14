@@ -5,8 +5,16 @@
 
 // Aligned for performance
 __attribute__((aligned(0x08))) 
-static uint64_t gdt_table[NUM_GDT_ENTRIES];
+static uint64_t gdt_table[GDT_NUM_ENTRIES];
 
+/**
+ * @brief Creates a gdt descriptor
+ * 
+ * @param base the base f the region
+ * @param limit the size of the region 
+ * @param flag eventual flags
+ * @return uint64_t the gdt descriptor
+ */
 static uint64_t gdt_create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
 {
     uint64_t descriptor;
@@ -27,6 +35,12 @@ static uint64_t gdt_create_descriptor(uint32_t base, uint32_t limit, uint16_t fl
     return descriptor;
 }
 
+/**
+ * @brief Initializes the global descriptor table
+ * Creates the kernel and user code and data segments (plus the zero entry)
+ * and load them in the gdt. Then create the gdtr and load it changing every 
+ * segment register to the kernel ones. 
+ */
 void gdt_init(void)
 {
     // The first entry must be set to zero

@@ -9,7 +9,7 @@ gdt_load:
     push 0x08
     lea rax, [rel .reload_CS]
     push rax
-    retfq
+    retfq ; In order to set the CS segment we need to perform a far jump
 
 .reload_CS:
     mov ax, 0x10

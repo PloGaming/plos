@@ -11,9 +11,12 @@
 // This is a basic implementation of a linked list allocator 
 
 static uint64_t kheap_start, kheap_end;
-struct kheap_node *kheap_head;
+static struct kheap_node *kheap_head;
 
-// This function will initialize the kernel heap
+/**
+ * @brief This function will initialize the kernel heap
+ * The kernel heap is placed after the kernel, using the remainig space on the VAS
+ */
 void kheap_init(void)
 {
     extern char _KERNEL_END;
@@ -36,7 +39,13 @@ void kheap_init(void)
     log_log_line(LOG_SUCCESS, "%s: Kernel heap initialized\n\tVirtual range: 0x%llx - 0x%llx", __FUNCTION__, kheap_start, kheap_end);
 }
 
-// Extends our kernel heap
+/**
+ * @brief Extends our kernel heap
+ * 
+ * @param size The amount of bytes our kernel heap grows
+ * @return true if the heap extension went successfully
+ * @return false if the heap extension failed
+ */
 bool kheap_extend(size_t size)
 {
     // Calculate the number of pages
@@ -96,12 +105,14 @@ bool kheap_extend(size_t size)
     return true;
 }
 
-/* 
-    Our kernel heap allocating function
-    It allocates a virtually contiguos memory region 
-    above the mapping of the kernel
-    not guaranteed to be physically contiguos
-*/
+/**
+ * @brief kernel heap allocating function
+ * It allocates a virtually contiguos memory region 
+ * above the mapping of the kernel
+ * not guaranteed to be physically contiguos
+ * @param size The minimum bytes that need to be reserved
+ * @return void* A virtual address pointing to the reserved region
+ */
 void* kmalloc(size_t size)
 {
     // Align the size to 16 bytes
@@ -112,7 +123,6 @@ void* kmalloc(size_t size)
     while(true)
     {
         currentNode = kheap_head;
-
 
         // Iterate the list of free nodes
         while(currentNode != NULL)
@@ -153,6 +163,10 @@ void* kmalloc(size_t size)
     }
 }
 
+/**
+ * @brief Prints all the nodes in the kernel heap
+ * It's a debug function, for understanding the current kernel heap structure 
+ */
 void kheap_print_nodes()
 {
     log_log_line(LOG_DEBUG, "%s: Kernel heap current nodes:", __FUNCTION__);
@@ -168,8 +182,10 @@ void kheap_print_nodes()
     }
 }
 
-// This function tries to coalesce near free blocks, 
-// useful to combat external fragmentation
+/**
+ * @brief Tries to coalesce near free blocks
+ * useful to combat external fragmentation
+ */
 static void kheap_coalesce()
 {
     struct kheap_node *current = kheap_head;
@@ -192,9 +208,11 @@ static void kheap_coalesce()
     }
 }
 
-/* 
-    Our kernel heap deallocator function
-*/
+/**
+ * @brief Our kernel heap deallocator function
+ * 
+ * @param ptr A pointer to a valid kernel heap region
+ */
 void kfree(void *ptr)
 {
     if(!ptr) return;

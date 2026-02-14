@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define NUM_GDT_ENTRIES 5
+#define GDT_NUM_ENTRIES 5
 
 #define GDT_NULL_SELECTOR   0
 #define GDT_KERNEL_CS       1
