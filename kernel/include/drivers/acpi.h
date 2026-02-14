@@ -6,6 +6,10 @@
 
 #define RSDP_SIGNATURE "RSD PTR "
 
+/**
+ * @brief The RSDP structure v1.0 with a 32 bit address for RSDT
+ * 
+ */
 struct RSDPDescriptorV1 {
     char Signature[8];
     uint8_t Checksum;
@@ -14,6 +18,10 @@ struct RSDPDescriptorV1 {
     uint32_t RsdtAddress;
 } __attribute__ ((packed));
 
+/**
+ * @brief The RSDP structure v2.0 with a 64 bit address for XSDT
+ * 
+ */
 struct RSDPDescriptorV2 {
     char Signature[8];
     uint8_t Checksum;

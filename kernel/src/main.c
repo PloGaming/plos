@@ -1,5 +1,6 @@
 #include <memory/kheap.h>
 #include <memory/paging.h>
+#include <memory/vmm.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -23,39 +24,35 @@ void kmain(void) {
 
     limine_verify_requests();
 
-    init_serial();
     log_init(LOG_SERIAL);
     
-    gdt_initialize_gdtTable();
-    idt_initialize_idtTable();
+    gdt_init();
+    idt_init();
     
     pic_disable();
 
     pmm_printUsableRegions();
-    pmm_initialize();
+    pmm_init();
     pmm_dump_state();
     paging_init();
     kheap_init();
+    vmm_init();
 
-    void *a = kmalloc(100);
-    kheap_print_nodes();
-    void *b = kmalloc(100);
-    kheap_print_nodes();
-    void *c = kmalloc(100);
-    kheap_print_nodes();
+    log_log_line(LOG_DEBUG, "=== TEST DEMAND PAGING ===");
 
-    // Heap: [A][B][C]...
+    // 1. Alloca 4KB Lazy
+    // PMM Usage non deve aumentare qui.
+    uint64_t *ptr = vmm_alloc(vmm_get_kernel_vas(), 4096, VMM_FLAGS_READ | VMM_FLAGS_WRITE, 0);
+    
+    log_log_line(LOG_DEBUG, "Allocated Virt: 0x%llx. Trying to write...", ptr);
 
-    kfree(a); 
-    kheap_print_nodes();
-    // Heap: [Free][B][C]...
+    // 2. SCRITTURA (Il momento della verità)
+    // Qui la CPU lancia INT 14 -> vmm_page_fault_handler -> pmm_alloc -> map -> return
+    *ptr = 12345; 
 
-    kfree(c);
-    kheap_print_nodes();
-    // Heap: [Free][B][Free]...
-
-    kfree(b);
-    kheap_print_nodes();
+    // 3. Se arrivi qui, ha funzionato!
+    log_log_line(LOG_SUCCESS, "Write Success! Value: %d", *ptr);
+    log_log_line(LOG_DEBUG, "=== TEST PASSED ===");
 
     if(!acpi_set_correct_RSDT())
     {

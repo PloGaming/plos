@@ -6,5 +6,6 @@
 int printf(char *fmt, ...);
 int vprintf(char *fmt, va_list ap);
 int sprintf(char *buf, char *fmt, ...);
+int vsprintf(char **out, char *format, va_list ap);
 
 #endif // LIBK_STDIO_H

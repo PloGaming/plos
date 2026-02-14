@@ -193,7 +193,7 @@ void pmm_free(uint64_t physAddr, uint64_t length)
 }
 
 // Initialize the buddy allocator
-void pmm_initialize()
+void pmm_init()
 {
     struct limine_memmap_response *memmap = memmap_request.response;
 

@@ -19,7 +19,7 @@ endif
 LD := $(TOOLCHAIN_PREFIX)ld
 
 # User controllable C flags.
-CFLAGS := -ggdb -O0
+CFLAGS := -ggdb -O2
 
 # User controllable C preprocessor flags. We set none by default.
 CPPFLAGS :=

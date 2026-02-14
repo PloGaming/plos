@@ -1,7 +1,6 @@
 #ifndef HHDM_H
 #define HHDM_H
 
-#include <stdint.h>
 #include <limine.h>
 
 void* hhdm_physToVirt(void *physical_addr);

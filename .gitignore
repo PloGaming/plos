@@ -5,3 +5,6 @@
 *.hdd
 *.log
 *.json
+/docs
+*.db
+doxygen_sqlite3.db

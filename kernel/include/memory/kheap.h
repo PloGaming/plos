@@ -5,19 +5,22 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// The starting size of our kernel heap (1MB)
-#define KHEAP_STARTING_SIZE 0x100000
-#define KHEAP_MIN_SPLITTING_SIZE 16
-#define KHEAP_BLOCK_SIZE 16
-#define KHEAP_EXTENDING_AMOUNT 0x100000
+#define KHEAP_STARTING_SIZE 0x100000 ///< The starting size of our kernel heap (1MB)
+#define KHEAP_MIN_SPLITTING_SIZE 16 ///< How much memory does a block need to be splitted
+#define KHEAP_BLOCK_SIZE 16 ///< An alignment made to each size request
+#define KHEAP_EXTENDING_AMOUNT 0x100000 ///< How much memory to extend our heap
 
-// The fundamental block of our heap
+/**
+ * @brief This struct describes a single region of the kernel heap
+ * The kernel heap is an ordered linked list of those nodes,
+ * each node can be free or used. Different nodes describe
+ * different non-overlapping memory regions
+ */
 struct kheap_node
 {
-    // The size of the region EXCLUDING its header size
-    uint64_t size;
-    bool isFree;
-    struct kheap_node *next;
+    uint64_t size; ///< The size of the region EXCLUDING its header size
+    bool isFree; ///< Is this region free?
+    struct kheap_node *next; ///< A pointer to the next node 
 };
 
 void kheap_init(void);

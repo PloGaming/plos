@@ -27,7 +27,7 @@ static uint64_t gdt_create_descriptor(uint32_t base, uint32_t limit, uint16_t fl
     return descriptor;
 }
 
-void gdt_initialize_gdtTable(void)
+void gdt_init(void)
 {
     // The first entry must be set to zero
     gdt_table[0] = 0;

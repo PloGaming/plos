@@ -3,8 +3,12 @@
 
 #include <stdbool.h>
 
+/**
+ * @brief A double linked list node
+ */
 struct double_ll_node {
-    struct double_ll_node *prev, *next;
+    struct double_ll_node *prev; ///< A pointer to the previous node
+    struct double_ll_node *next; ///< A pointer to the next node
 };
 
 inline void dll_init(struct double_ll_node *list);

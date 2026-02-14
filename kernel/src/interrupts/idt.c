@@ -25,7 +25,7 @@ void idt_set_descriptor(uint8_t vector, void *isr, uint8_t flags)
 }
 
 // Initializes the idt table
-void idt_initialize_idtTable(void)
+void idt_init(void)
 {
     // Fill the idt's 256 entries with the stub table
     for(size_t i = 0; i < IDT_NUM_ENTRIES; i++)

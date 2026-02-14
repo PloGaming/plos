@@ -194,6 +194,19 @@ void paging_map_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_ad
         __FUNCTION__, virt_addr, virtual, phys_addr, physical);
 }
 
+void paging_unmap_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t size, bool isHugePage)
+{
+    uint64_t virtual;
+    for(virtual = virt_addr; virtual < virt_addr + size; isHugePage ? 
+        (virtual += PAGING_HUGE_PAGE_SIZE) : 
+        (virtual += PAGING_PAGE_SIZE))
+    {
+        paging_unmap_page(pml4_root, virtual, isHugePage);
+    }
+    log_log_line(LOG_DEBUG, "%s: Memory region unmapped\n\tvirtual range: 0x%llx - 0x%llx\n", 
+        __FUNCTION__, virt_addr, virtual);
+}
+
 // This function should be called at the start to initialize the vmm
 void paging_init(void)
 {
