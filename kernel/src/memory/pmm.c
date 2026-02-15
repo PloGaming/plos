@@ -45,7 +45,12 @@ static inline bool is_page_free(struct pmm_page *page) { return !(page->flags & 
 
 /*************************************************************************/
 
-// Frees an entire block of pages of order x: 0 = 4KB
+/**
+ * @brief Frees an entire block of pages of order x
+ * 
+ * @param phys The physical address of the starting block. HAS to be aligned
+ * @param order The size of the block: 0 = 4KB up to PMM_MAX_ORDER
+ */
 void pmm_free_pages(uint64_t phys, uint32_t order)
 {
     if(phys % PMM_PAGE_SIZE)
@@ -103,7 +108,14 @@ void pmm_free_pages(uint64_t phys, uint32_t order)
     free_areas[order].nr_free++;
 }
 
-// Allocates 2^order page. Returns the physical address
+/**
+ * @brief Allocates 2^(12 + order) page.
+ * 
+ * @param order 
+ * @return uint64_t the starting physical address of the newly allocated block
+ * returns 0 if the allocation failed
+ * @note the returned address is ALWAYS aligned to a page boundary
+ */
 uint64_t pmm_alloc_pages(uint32_t order)
 {
     if(order >= PMM_MAX_ORDER) return 0;
@@ -158,7 +170,12 @@ uint64_t pmm_alloc_pages(uint32_t order)
     return page_to_phys(page);
 }
 
-// Convert a size (bytes) into log2(bytes)
+/**
+ * @brief Convert a size (bytes) into an order type
+ * 
+ * @param size Num of bytes to convert
+ * @return uint32_t The corresponding order
+ */
 static uint32_t pmm_get_order_from_size(uint64_t size)
 {
     uint64_t pages_needed = size / PMM_PAGE_SIZE;
@@ -170,7 +187,13 @@ static uint32_t pmm_get_order_from_size(uint64_t size)
     return order;
 }
 
-// Our main function for allocating physical memory
+/**
+ * @brief Our main function for allocating physical memory
+ * 
+ * @param size The number of bytes of physical memory to allocate
+ * @return uint64_t the physical address of the newly allocated block
+ * if the returned value is 0 then the allocation was unsuccesfull
+ */
 uint64_t pmm_alloc(uint64_t size)
 {
     uint32_t order = pmm_get_order_from_size(size);
@@ -182,7 +205,12 @@ uint64_t pmm_alloc(uint64_t size)
     return phys;
 }
 
-// Our main function for deallocating physical memory
+/**
+ * @brief Our main function for deallocating physical memory
+ * 
+ * @param physAddr The physical address of the starting block 
+ * @param length The number of bytes of our allocation
+ */
 void pmm_free(uint64_t physAddr, uint64_t length)
 {
     uint32_t order = pmm_get_order_from_size(length);
@@ -192,7 +220,13 @@ void pmm_free(uint64_t physAddr, uint64_t length)
     used_pages -= (1ULL << order);
 }
 
-// Initialize the buddy allocator
+/**
+ * @brief Initialize the buddy allocator
+ * 1) Finds the highest usable RAM address
+ * 2) Create and initialize the memmap and freelist
+ * 3) Populate the structs with valid entries
+ * 4) Coalesce all free entries
+ */
 void pmm_init()
 {
     struct limine_memmap_response *memmap = memmap_request.response;
@@ -320,7 +354,12 @@ void pmm_init()
     log_log_line(LOG_SUCCESS, "%s: PMM initialized:\n\tBuddy allocator structures size %lu bytes\n\tBuddy allocator start virt addr 0x%lx\n\tManaging %llu pages", __FUNCTION__, buddy_memmap_size, buddy_memmap, totalPages);
 }
 
-// Increment the reference count on the page
+/**
+ * @brief Increment the reference count on a physical page
+ * 
+ * @param phys The physical address of the page we want to increment it's ref count
+ * @note pmm_alloc already sets to 1 the allocated page
+ */
 void pmm_page_inc_ref(uint64_t phys)
 {
     struct pmm_page *page = phys_to_page(phys);
@@ -329,7 +368,12 @@ void pmm_page_inc_ref(uint64_t phys)
         page->ref_count++;
 }
 
-// Decrements the reference count on the page, if it reaches zero it also frees it
+/**
+ * @brief Decrements the reference count on the page
+ * 
+ * @param phys The physical address of the page we want to decrement it's ref count
+ * @note if ref count reaches zero it also frees it
+ */
 void pmm_page_dec_ref(uint64_t phys)
 {
     struct pmm_page *page = phys_to_page(phys);
@@ -344,7 +388,9 @@ void pmm_page_dec_ref(uint64_t phys)
     }
 }
 
-// Prints the state of our buddy allocator, nicely formatted
+/**
+ * @brief Prints the state of our buddy allocator, nicely formatted 
+ */
 void pmm_dump_state(void)
 {
     log_log_line(LOG_DEBUG, "--- BUDDY ALLOCATOR STATE ---");
@@ -367,7 +413,10 @@ void pmm_dump_state(void)
     log_log_line(LOG_DEBUG, "-----------------------------");
 }
 
-// Print the usable physical regions
+/**
+ * @brief Print the usable physical regions
+ * @note limine_memmap_response needs to be available 
+ */
 void pmm_printUsableRegions()
 {
     struct limine_memmap_response *memmap = memmap_request.response;
@@ -383,7 +432,11 @@ void pmm_printUsableRegions()
     }
 }
 
-// Returns the highest RAM address
+/**
+ * @brief Returns the highest RAM address
+ * 
+ * @return uint64_t The highest RAM address
+ */
 uint64_t pmm_getHighestAddr(void)
 {
     return highestAddr;
