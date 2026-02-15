@@ -57,6 +57,7 @@ override CFLAGS += \
 override CPPFLAGS := \
     -I src \
     -I limine-protocol/include \
+    -I flanterm/src \
     -isystem include \
     -isystem freestnd-c-hdrs/include \
     $(CPPFLAGS) \
@@ -95,7 +96,7 @@ override LDFLAGS += \
 
 # Use "find" to glob all *.c, *.S, and *.asm files in the tree
 # (except the src/arch/* directories, as those are gonna be added in the next step).
-override SRCFILES := $(shell find -L src cc-runtime/src -type f 2>/dev/null | LC_ALL=C sort)
+override SRCFILES := $(shell find -L src cc-runtime/src flanterm/src -type f 2>/dev/null | LC_ALL=C sort)
 # Obtain the object and header dependencies file names.
 override CFILES := $(filter %.c,$(SRCFILES))
 override ASFILES := $(filter %.S,$(SRCFILES))
@@ -138,4 +139,4 @@ clean:
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean:
-	rm -rf bin obj .deps-obtained .cache compile_commands.json cc-runtime limine-protocol
+	rm -rf bin obj .deps-obtained .cache compile_commands.json cc-runtime limine-protocol flanterm

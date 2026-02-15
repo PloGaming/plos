@@ -56,7 +56,7 @@ limine/limine:
 		LDFLAGS="$(HOST_LDFLAGS)" \
 		LIBS="$(HOST_LIBS)"
 
-kernel/.deps-obtained:
+kernel/.deps-obtained: ./kernel/get-deps
 	./kernel/get-deps
 
 .PHONY: kernel
