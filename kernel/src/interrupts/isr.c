@@ -1,4 +1,5 @@
 #include <common/logging.h>
+#include <drivers/lapic.h>
 #include <memory/vmm.h>
 #include <interrupts/isr.h>
 #include <cpu.h>
@@ -11,12 +12,16 @@
  */
 void interrupt_handler(struct isr_context *context)
 {
-    log_line(LOG_DEBUG, "Interrupt fired: 0x%llx error code: 0x%llx", context->vector_number, context->error_code);
     switch(context->vector_number)
     {
-        // Page fault
-        case 14:
+        case 14: // Page fault
             vmm_page_fault_handler(context);
-        break;
+            break;
+        case 0xFF: // Spurious interrupt
+            lapic_spurious_isr();
+            break;
+        default:
+            log_line(LOG_DEBUG, "Interrupt fired: 0x%llx error code: 0x%llx", context->vector_number, context->error_code);
+            break;
     }
 }
