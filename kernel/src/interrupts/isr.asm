@@ -50,13 +50,16 @@ common_interrupt_handler:
     ; Our external C function
     call interrupt_handler
 
+    ; Restore the previous (or changed) cpu context
+    mov rsp, rax
+
     pop rax
     pop rbx
     pop rcx
     pop rdx
     pop rsi
     pop rdi
-    pop rsp
+    add rsp, 8 ; To now overwrite rsp
     pop rbp
     pop r8
     pop r9

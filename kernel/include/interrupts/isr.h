@@ -8,7 +8,7 @@
  * It describes the previous state of the gpr, the interrupt vector number and
  * an error code which is sometimes pushed with some particular CPU exceptions
  */
-struct isr_context
+struct cpu_status
 {
     uint64_t general_purpose_registers[16]; ///< The 16 GPRs
 
@@ -22,6 +22,6 @@ struct isr_context
     uint64_t ss;
 } __attribute__((packed));
 
-void interrupt_handler(struct isr_context *context);
+struct cpu_status* interrupt_handler(struct cpu_status *context);
 
 #endif // ISR_H

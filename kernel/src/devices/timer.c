@@ -1,7 +1,10 @@
 #include <common/logging.h>
 #include <devices/timer.h>
+#include <scheduling/scheduler.h>
+#include <scheduling/task.h>
 #include <drivers/lapic.h>
 #include <drivers/portsIO.h>
+#include <interrupts/isr.h>
 #include <stdint.h>
 
 static uint64_t system_ticks = 0;
@@ -91,7 +94,6 @@ void timer_init(void)
     tsc_boot_time = end_tsc_timer;
 
     log_line(LOG_SUCCESS, "CPU Frequency (TSC): %llu MHz", tsc_freq_hz / 1000000);
-    log_line(LOG_SUCCESS, "LAPIC Frequency: %llu ticks/ms", lapic_ticks_per_ms);
 
     // Configure the timer interrupt as periodic and set the idt entry to call
     lapic_write(LAPIC_LVT_TIMER_REG, LAPIC_LVT_VECTOR | LAPIC_LVT_PERIODIC);
@@ -101,22 +103,61 @@ void timer_init(void)
     lapic_write(LAPIC_INITIAL_COUNT_REG, lapic_ticks_per_ms * (1000 / TIMER_FREQUENCY_HZ));
 }
 
+/**
+ * @brief Return the current uptime in ticks
+ * 
+ * @return uint64_t The ticks
+ */
 uint64_t timer_get_uptime_ticks()
 {
     return system_ticks;
 }
 
+/**
+ * @brief Return the current uptime in milliseconds
+ * 
+ * @return uint64_t The milliseconds
+ */
 uint64_t timer_get_uptime_ms()
 {
-    if (tsc_freq_hz > 0) {
-        uint64_t diff = rdtsc() - tsc_boot_time;
-        return diff / (tsc_freq_hz / 1000);
-    }
-    return system_ticks * (1000 / TIMER_FREQUENCY_HZ);
+    uint64_t diff = rdtsc() - tsc_boot_time;
+    return diff / (tsc_freq_hz / 1000);
 }
 
-void timer_handler(void)
+
+extern struct task *task_current;
+/**
+ * @brief The ISR for the scheduler
+ */
+ struct cpu_status* timer_handler(struct cpu_status* context)
 {
     system_ticks++;
     lapic_send_EOI();
+
+    if(task_current)
+    {
+        // The time for this task has ended time for scheduling another
+        task_current->ticks_remaining--;
+        if(task_current->ticks_remaining == 0)
+        {
+            task_current->ticks_remaining = TASK_INITIAL_TICKS; // We restore them
+            return scheduler_schedule(context);
+        }
+    }
+
+    return context;
 }
+
+/**
+ * @brief Blocks the execution for ms milliseconds
+ * @param ms how many milliseconds to block
+ */
+ void timer_sleep(uint64_t ms)
+ {
+     uint64_t start = timer_get_uptime_ms();
+     
+     // Busy wait
+     while (timer_get_uptime_ms() < start + ms) {
+        asm volatile("pause");
+     }
+ }

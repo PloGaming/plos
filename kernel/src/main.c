@@ -5,6 +5,8 @@
 #include <memory/kheap.h>
 #include <memory/paging.h>
 #include <memory/vmm.h>
+#include <scheduling/scheduler.h>
+#include <scheduling/task.h>
 #include <stdbool.h>
 #include <limine.h>
 #include <cpu.h>
@@ -18,6 +20,22 @@
 #include <limine_requests.h>
 #include <memory/hhdm.h>
 #include <libk/stdio.h>
+
+void thread_a() {
+    while(1) {
+        log_line(LOG_DEBUG, "Ping dal Thread A!");
+        
+        for(volatile int i = 0; i < 50000000; i++); 
+    }
+}
+
+void thread_b() {
+    while(1) {
+        log_line(LOG_DEBUG, "Pong dal Thread B!");
+        
+        for(volatile int i = 0; i < 50000000; i++);
+    }
+}
 
 // This is our kernel's entry point.
 void kmain(void) {
@@ -50,8 +68,14 @@ void kmain(void) {
 
     timer_init();
 
+    scheduler_init();
+
+    task_create("Thread a", thread_a, 1);
+    task_create("Thread b", thread_b, 2);
+
     asm volatile ("sti");
 
     // We're done, just hang...
     hcf();
 }
+

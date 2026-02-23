@@ -2,6 +2,7 @@
 #define TIMER_H
 
 #include <stdint.h>
+#include <interrupts/isr.h>
 
 #define TIMER_FREQUENCY_HZ 100
 
@@ -22,7 +23,7 @@
 
 void timer_init(void);
 
-void timer_handler(void);
+struct cpu_status* timer_handler(struct cpu_status* context);
 
 uint64_t timer_get_uptime_ms();
 uint64_t timer_get_uptime_ticks();

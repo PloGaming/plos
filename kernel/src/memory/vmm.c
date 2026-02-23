@@ -172,12 +172,17 @@ void *vmm_alloc(struct vm_address_space *space, uint64_t size, uint64_t flags, u
 
         log_line(LOG_DEBUG, "%s: MMIO Mapped v=0x%llx -> p=0x%llx", __FUNCTION__, candidate, phys_base);
     }
-    else 
+    else if(flags & VMM_FLAGS_ANON)
     {
         // Demanding paging
         // We do nothing, the page fault handler will load the page
         // as soon as the prcess accesses those addresses
         log_line(LOG_DEBUG, "VMM: Lazy Allocation at v=0x%llx (Phys: None yet)", candidate);
+    }
+    else 
+    {
+        log_line(LOG_ERROR, "%s: Invalid user access", __FUNCTION__);
+        hcf();
     }
 
     return (void *) new_area->base;
@@ -316,7 +321,7 @@ uint64_t vmm_generic_to_x86_flags(uint64_t genericFlags)
  * it was the process fault, accessing a page it shouldn't have. 
  * @param context The state of the process before firing the page fault
  */
-void vmm_page_fault_handler(struct isr_context *context)
+void vmm_page_fault_handler(struct cpu_status *context)
 {
     // Cr2 is the address who caused the page fault
     uint64_t cr2;

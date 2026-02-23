@@ -65,6 +65,6 @@ void vmm_free(struct vm_address_space *space, uint64_t addr);
 struct vm_address_space* vmm_get_kernel_vas(void);
 uint64_t vmm_generic_to_x86_flags(uint64_t genericFlags);
 
-void vmm_page_fault_handler(struct isr_context *context);
+void vmm_page_fault_handler(struct cpu_status *context);
 
 #endif // VMM_H
