@@ -125,7 +125,7 @@ uint64_t timer_get_uptime_ms()
 }
 
 
-extern struct task *task_current;
+extern struct thread *thread_current;
 /**
  * @brief The ISR for the scheduler
  */
@@ -134,13 +134,13 @@ extern struct task *task_current;
     system_ticks++;
     lapic_send_EOI();
 
-    if(task_current)
+    if(thread_current)
     {
         // The time for this task has ended time for scheduling another
-        task_current->ticks_remaining--;
-        if(task_current->ticks_remaining == 0)
+        thread_current->ticks_remaining--;
+        if(thread_current->ticks_remaining == 0)
         {
-            task_current->ticks_remaining = TASK_INITIAL_TICKS; // We restore them
+            thread_current->ticks_remaining = THREAD_INITIAL_TICKS; // We restore them
             return scheduler_schedule(context);
         }
     }

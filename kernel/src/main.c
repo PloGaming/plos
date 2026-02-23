@@ -25,13 +25,21 @@ void thread_a() {
     while(1) {
         log_line(LOG_DEBUG, "Ping dal Thread A!");
         
-        scheduler_yield();
+        for(volatile int i = 0; i < 50000000; i++);
     }
 }
 
 void thread_b() {
     while(1) {
         log_line(LOG_DEBUG, "Pong dal Thread B!");
+        
+        for(volatile int i = 0; i < 50000000; i++);
+    }
+}
+
+void thread_c() {
+    while(1) {
+        log_line(LOG_DEBUG, "Pong dal Thread C!");
         
         for(volatile int i = 0; i < 50000000; i++);
     }
@@ -70,9 +78,15 @@ void kmain(void) {
 
     scheduler_init();
 
-    task_create("Thread a", thread_a);
-    task_create("Thread b", thread_b);
+    /**************************** TEST ******************************/
+    struct task *process_a = task_create("Process A");
+    task_create_thread(process_a, thread_a);
 
+    struct task *process_b = task_create("Process B");
+    task_create_thread(process_b, thread_b);
+    task_create_thread(process_b, thread_c);
+    /**************************** END TEST ******************************/
+    
     asm volatile ("sti");
 
     // We're done, just hang...
