@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 
+#define PAGE_FAULT_VECTOR   14
+#define LAPIC_TIMER_VECTOR  32
+#define YIELD_VECTOR        50
+#define SPURIOUS_VECTOR     0xFF
+
 /**
  * @brief All the information about the caller when the interrupt is called
  * It describes the previous state of the gpr, the interrupt vector number and

@@ -72,3 +72,11 @@ struct cpu_status *scheduler_schedule(struct cpu_status *status)
 
     return task_current->kstack_sp;
 }
+
+/**
+ * @brief Yields the cpu for the current process
+ */
+void scheduler_yield()
+{
+    asm volatile("int $50");
+}

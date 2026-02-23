@@ -4,6 +4,7 @@
 #include <memory/vmm.h>
 #include <interrupts/isr.h>
 #include <cpu.h>
+#include <scheduling/scheduler.h>
 
 /**
  * @brief Main interrupt handler
@@ -18,13 +19,16 @@ struct cpu_status* interrupt_handler(struct cpu_status *context)
 
     switch(context->vector_number)
     {
-        case 14: // Page fault
+        case PAGE_FAULT_VECTOR:
             vmm_page_fault_handler(context);
             break;
-        case 32: // Lapic timer (scheduling) 
+        case LAPIC_TIMER_VECTOR: // forced pre-emption 
             next_stack = timer_handler(context);
             break;
-        case 0xFF: // Spurious interrupt
+        case YIELD_VECTOR: // voluntarily pre-emption
+            next_stack = scheduler_schedule(context);
+            break;
+        case SPURIOUS_VECTOR: // LAPIC 
             lapic_spurious_isr();
             break;
         default:

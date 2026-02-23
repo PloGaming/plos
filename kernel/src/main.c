@@ -25,7 +25,7 @@ void thread_a() {
     while(1) {
         log_line(LOG_DEBUG, "Ping dal Thread A!");
         
-        for(volatile int i = 0; i < 50000000; i++); 
+        scheduler_yield();
     }
 }
 
@@ -70,8 +70,8 @@ void kmain(void) {
 
     scheduler_init();
 
-    task_create("Thread a", thread_a, 1);
-    task_create("Thread b", thread_b, 2);
+    task_create("Thread a", thread_a);
+    task_create("Thread b", thread_b);
 
     asm volatile ("sti");
 

@@ -12,6 +12,7 @@
 
 extern struct task *task_current;
 extern struct task *task_list;
+uint64_t next_pid = 1;
 
 /**
  * @brief Creates a new kernel process
@@ -21,7 +22,7 @@ extern struct task *task_list;
  * @param pid Process identifier, an unique number for identifying our task
  * @return struct task* Pointer to the newly allocated task if successful, otherwise NULL
  */
-struct task *task_create(const char *name, void (*entry_point)(), uint64_t pid)
+struct task *task_create(const char *name, void (*entry_point)())
 {
     // Allocate space for the new kernel task struct
     struct task *new_task = kmalloc(sizeof(struct task));
@@ -70,7 +71,7 @@ struct task *task_create(const char *name, void (*entry_point)(), uint64_t pid)
     strcpy(new_task->name, name);
     new_task->state = TASK_READY;
     new_task->ticks_remaining = TASK_INITIAL_TICKS;
-    new_task->pid = pid;
+    new_task->pid = next_pid++; // we have 2^64 possible pids, i won't check if we overflow :)
 
     // We add it to the list of tasks
     if(task_list == NULL)

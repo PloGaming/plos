@@ -40,6 +40,6 @@ struct task
     struct task *next;
 };
 
-struct task *task_create(const char *name, void (*entry_point)(), uint64_t pid);
+struct task *task_create(const char *name, void (*entry_point)());
 
 #endif // TASK_H

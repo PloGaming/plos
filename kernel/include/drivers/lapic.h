@@ -14,7 +14,6 @@
 #define APIC_ENABLE_BIT     0x100
 
 #define LAPIC_REG_SPURIOUS  0x0F0
-#define SPURIOUS_VECTOR     0xFF
 #define LAPIC_REG_EOI       0x00B0
 
 void lapic_initialize(void);

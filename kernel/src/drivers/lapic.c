@@ -1,4 +1,5 @@
 #include <common/logging.h>
+#include <interrupts/isr.h>
 #include <memory/vmm.h>
 #include <memory/paging.h>
 #include <stdint.h>
