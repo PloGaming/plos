@@ -219,7 +219,7 @@ struct vm_area *vmm_get_vm_area(struct vm_address_space *space, uint64_t vaddr)
  * @brief Function for removing the page mapping of a block
  * 
  * @param space The address space we're interested in
- * @param addr The base address of the virtual memory region
+ * @param addr The address belonging in the virtual memory region
  */
 void vmm_free(struct vm_address_space *space, uint64_t addr)
 {
@@ -231,7 +231,7 @@ void vmm_free(struct vm_address_space *space, uint64_t addr)
     while(current != NULL)
     {
         // We found the region
-        if(current->base == addr)
+        if(current->base <= addr && current->base + current->size > addr)
         {
             // Delete it from the list
             if(prev == NULL)

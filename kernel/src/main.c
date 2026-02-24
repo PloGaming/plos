@@ -22,27 +22,15 @@
 #include <libk/stdio.h>
 
 void thread_a() {
-    while(1) {
-        log_line(LOG_DEBUG, "Ping dal Thread A!");
-        
-        for(volatile int i = 0; i < 50000000; i++);
-    }
+    log_line(LOG_DEBUG, "Ping dal Thread A!");
 }
 
 void thread_b() {
-    while(1) {
-        log_line(LOG_DEBUG, "Pong dal Thread B!");
-        
-        for(volatile int i = 0; i < 50000000; i++);
-    }
+    log_line(LOG_DEBUG, "Pong dal Thread B!");
 }
 
 void thread_c() {
-    while(1) {
-        log_line(LOG_DEBUG, "Pong dal Thread C!");
-        
-        for(volatile int i = 0; i < 50000000; i++);
-    }
+    log_line(LOG_DEBUG, "Pong dal Thread C!");
 }
 
 // This is our kernel's entry point.
@@ -89,7 +77,5 @@ void kmain(void) {
     
     asm volatile ("sti");
 
-    // We're done, just hang...
-    hcf();
+    kernel_idle_thread();
 }
-

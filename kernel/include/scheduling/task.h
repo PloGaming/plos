@@ -55,4 +55,10 @@ struct thread
 struct task *task_create(const char *name);
 struct thread *task_create_thread(struct task *task, void (*entry_point)());
 
+__attribute__((noreturn))
+void task_current_thread_exit(void);
+
+__attribute__((noreturn))
+void kernel_idle_thread();
+
 #endif // TASK_H
