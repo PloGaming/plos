@@ -1,4 +1,5 @@
 #include <common/logging.h>
+#include <devices/timer.h>
 #include <interrupts/isr.h>
 #include <scheduling/task.h>
 #include <memory/gdt/gdt.h>
@@ -192,6 +193,7 @@ void kernel_idle_thread()
                     struct thread *curr_thread = prev_thread->next;
                     bool task_empty = false;
 
+                    // Iterate all threads
                     do
                     {
                         if(curr_thread->state == THREAD_ZOMBIE)
@@ -206,7 +208,10 @@ void kernel_idle_thread()
                             }
                             else 
                             {
+                                // Unlink the thread from the list
                                 prev_thread->next = curr_thread->next;
+
+                                // If it's the head
                                 if(curr_thread == curr_task->threads)
                                 {
                                     curr_task->threads = curr_thread->next;
@@ -235,8 +240,26 @@ void kernel_idle_thread()
             } while(curr_task != task_list);
         }
 
+        // Reenable interrupts
         asm volatile ("sti");
 
         asm volatile ("hlt");
     }
+}
+
+/**
+ * @brief Set the current thread to sleep
+ * 
+ * @param ms the amount of milliseconds to put the thread to sleep
+ */
+void thread_sleep(uint64_t ms)
+{
+    asm volatile ("cli");
+
+    thread_current->wake_time = timer_get_uptime_ms() + ms;
+    thread_current->state = THREAD_SLEEPING;
+
+    asm volatile ("sti");
+
+    scheduler_yield();
 }

@@ -18,7 +18,8 @@ enum thread_state
     THREAD_READY, ///< Ready to be executed
     THREAD_RUNNING, ///< Currently executing
     THREAD_BLOCKED, ///< Waiting for I/O
-    THREAD_ZOMBIE ///< Finished, waiting for cleanup
+    THREAD_ZOMBIE, ///< Finished, waiting for cleanup
+    THREAD_SLEEPING ///< The thread is sleeping
 };
 
 /**
@@ -49,6 +50,8 @@ struct thread
     enum thread_state state; ///< Its current state
     uint64_t ticks_remaining; ///< How many ticks before scheduling another thread?
 
+    uint64_t wake_time; ///< Used for thread sleeping
+
     struct thread *next; ///< Pointer to the next thread
 };
 
@@ -60,5 +63,7 @@ void task_current_thread_exit(void);
 
 __attribute__((noreturn))
 void kernel_idle_thread();
+
+void thread_sleep(uint64_t ms);
 
 #endif // TASK_H

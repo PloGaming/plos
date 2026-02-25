@@ -134,6 +134,8 @@ extern struct thread *thread_current;
     system_ticks++;
     lapic_send_EOI();
 
+    scheduler_wake_sleeping_threads();
+    
     if(thread_current)
     {
         // The time for this task has ended time for scheduling another

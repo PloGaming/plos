@@ -22,15 +22,15 @@
 #include <libk/stdio.h>
 
 void thread_a() {
-    log_line(LOG_DEBUG, "Ping dal Thread A!");
+    log_line(LOG_DEBUG, "%s: Started time: %lld ms", __FUNCTION__, timer_get_uptime_ms());
 }
 
 void thread_b() {
-    log_line(LOG_DEBUG, "Pong dal Thread B!");
+    log_line(LOG_DEBUG, "%s: Started time: %lld ms", __FUNCTION__, timer_get_uptime_ms());
 }
 
 void thread_c() {
-    log_line(LOG_DEBUG, "Pong dal Thread C!");
+    log_line(LOG_DEBUG, "%s: Started time: %lld ms", __FUNCTION__, timer_get_uptime_ms());
 }
 
 // This is our kernel's entry point.

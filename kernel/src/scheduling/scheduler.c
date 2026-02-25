@@ -1,5 +1,6 @@
 #include <common/logging.h>
 #include <cpu.h>
+#include <devices/timer.h>
 #include <interrupts/isr.h>
 #include <memory/kheap.h>
 #include <memory/vmm.h>
@@ -7,6 +8,7 @@
 #include <scheduling/task.h>
 #include <libk/string.h>
 #include <stddef.h>
+#include <stdint.h>
 
 // The current task/thread executing
 struct task *task_current = NULL;
@@ -137,6 +139,40 @@ struct cpu_status *scheduler_schedule(struct cpu_status *status)
     thread_current->state = THREAD_RUNNING;
 
     return thread_current->context;
+}
+
+/**
+ * @brief Iterate all threads to wake up the sleeping ones
+ */
+void scheduler_wake_sleeping_threads()
+{
+    if(!task_list) return;
+
+    uint64_t currTimeMs = timer_get_uptime_ms();
+
+    // Iterate all tasks
+    struct task *curr_task = task_list;
+    do 
+    {
+        if(curr_task->threads != NULL)
+        {
+            // Iterate all threads
+            struct thread *curr_thread = curr_task->threads;
+            do
+            {
+                // Wakeup the thread
+                if(curr_thread->state == THREAD_SLEEPING && curr_thread->wake_time <= currTimeMs)
+                {
+                    curr_thread->state = THREAD_READY;
+                    curr_thread->wake_time = 0;
+                }
+
+                curr_thread = curr_thread->next;
+            } while(curr_thread != curr_task->threads);
+        }
+
+        curr_task = curr_task->next;
+    } while (curr_task != task_list);
 }
 
 /**
