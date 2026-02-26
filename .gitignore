@@ -7,4 +7,6 @@
 *.json
 /docs
 *.db
+/.vscode
+/.idea
 doxygen_sqlite3.db

@@ -44,5 +44,12 @@ void lock_release(struct lock_ticket *lock)
     if(!lock) return;
 
     // We finished to use the lock so we simply increment the turn
-    __atomic_fetch_add(&lock->ticket, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&lock->turn, 1, __ATOMIC_SEQ_CST);
+}
+
+void spinlock_acquire(struct spinlock *lock)
+{
+    if(!lock) return;
+
+    
 }

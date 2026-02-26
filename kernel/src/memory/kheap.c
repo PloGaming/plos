@@ -4,6 +4,7 @@
 #include <memory/kheap.h>
 #include <memory/pmm.h>
 #include <memory/paging.h>
+#include <scheduling/lock.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
