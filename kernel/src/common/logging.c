@@ -1,3 +1,4 @@
+#include <scheduling/lock.h>
 #include <common/logging.h>
 #include <drivers/serial.h>
 #include <drivers/console.h>
@@ -7,7 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-char log_buffer[LOG_BUFFER_DIM];
+static char log_buffer[LOG_BUFFER_DIM];
 
 char *log_labels[] = {
     "DBG",
