@@ -382,8 +382,8 @@ void pmm_page_dec_ref(uint64_t phys)
         page->ref_count--;
         if(page->ref_count == 0)
         {
+            used_pages -= (1ULL << page->order);
             pmm_free_pages(phys, page->order);
-            used_pages--;
         }
     }
 }
