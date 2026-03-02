@@ -4,6 +4,7 @@
 #include <interrupts/isr.h>
 #include <memory/kheap.h>
 #include <memory/vmm.h>
+#include <scheduling/lock.h>
 #include <scheduling/scheduler.h>
 #include <scheduling/task.h>
 #include <libk/string.h>
@@ -16,6 +17,8 @@ struct thread *thread_current = NULL;
 
 // A circular linked list of the current tasks in the system
 struct task *task_list = NULL;
+
+struct spinlock_irq scheduler_lock = SPINLOCK_IRQ_INIT;
 
 /**
  * @brief Initializes the scheduler, simply creates an idle task and thread
@@ -76,6 +79,9 @@ void scheduler_init()
 struct cpu_status *scheduler_schedule(struct cpu_status *status)
 {
     if(!task_current || !thread_current) return status;
+
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&scheduler_lock, &irq_flags);
 
     // We "pause" the old thread
     if(thread_current->state == THREAD_RUNNING)
@@ -148,6 +154,8 @@ struct cpu_status *scheduler_schedule(struct cpu_status *status)
 
     thread_current->state = THREAD_RUNNING;
 
+    spinlock_irq_release(&scheduler_lock, &irq_flags);
+
     return thread_current->context;
 }
 
@@ -157,6 +165,9 @@ struct cpu_status *scheduler_schedule(struct cpu_status *status)
 void scheduler_wake_sleeping_threads()
 {
     if(!task_list) return;
+
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&scheduler_lock, &irq_flags);
 
     uint64_t currTimeMs = timer_get_uptime_ms();
 
@@ -183,6 +194,8 @@ void scheduler_wake_sleeping_threads()
 
         curr_task = curr_task->next;
     } while (curr_task != task_list);
+
+    spinlock_irq_release(&scheduler_lock, &irq_flags);
 }
 
 /**

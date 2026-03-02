@@ -1,6 +1,7 @@
 #include <common/logging.h>
 #include <devices/timer.h>
 #include <interrupts/isr.h>
+#include <scheduling/lock.h>
 #include <scheduling/task.h>
 #include <memory/gdt/gdt.h>
 #include <memory/kheap.h>
@@ -15,6 +16,8 @@
 extern struct task *task_current;
 extern struct thread *thread_current;
 extern struct task *task_list;
+
+extern struct spinlock_irq scheduler_lock;
 
 uint64_t next_pid = 1;
 uint64_t next_tid = 1;
@@ -42,6 +45,9 @@ struct task *task_create(const char *name)
     new_task->pid = next_pid++; // we have 2^64 possible pids, i won't check if we overflow :)
     new_task->threads = NULL; // No threads
 
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&scheduler_lock, &irq_flags);
+
     // We add it to the list of tasks
     if(task_list == NULL)
     {
@@ -59,10 +65,19 @@ struct task *task_create(const char *name)
         new_task->next = task_list;
     }
 
+    spinlock_irq_release(&scheduler_lock, &irq_flags);
+
     log_line(LOG_DEBUG, "%s: Task created %s (PID %lld)", __FUNCTION__, new_task->name, new_task->pid);
     return new_task;
 }
 
+/**
+ * @brief Creates a new thread for a task
+ * 
+ * @param task The task we want to add the thread to
+ * @param entry_point The pointer to the thread's code entry point
+ * @return struct thread* The newly created thread on success, NULL on failure
+ */
 struct thread *task_create_thread(struct task *task, void (*entry_point)())
 {
     // Sanity check
@@ -119,8 +134,8 @@ struct thread *task_create_thread(struct task *task, void (*entry_point)())
     new_thread->ticks_remaining = THREAD_INITIAL_TICKS;
     new_thread->tid = next_tid++; // we have 2^64 possible tids, i won't check if we overflow :)
 
-    // Disable interrupts while we modify the list
-    asm volatile("cli");
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&scheduler_lock, &irq_flags);
 
     // We add it to the list of threads of the task
     if(task->threads == NULL)
@@ -139,7 +154,7 @@ struct thread *task_create_thread(struct task *task, void (*entry_point)())
         new_thread->next = task->threads;
     }
 
-    asm volatile("sti");
+    spinlock_irq_release(&scheduler_lock, &irq_flags);
 
     log_line(LOG_DEBUG, "%s: Thread created to process PID %lld (TID %lld)", __FUNCTION__, task->pid, new_thread->tid);
     return new_thread;
@@ -151,13 +166,15 @@ struct thread *task_create_thread(struct task *task, void (*entry_point)())
 __attribute__((noreturn))
 void task_current_thread_exit()
 {
-    // Disable interrupts while we modify the status of a thread
-    asm volatile("cli");
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&scheduler_lock, &irq_flags);
 
     log_line(LOG_DEBUG, "%s: Thread TID %lld of task PID %lld is terminated", __FUNCTION__, thread_current->tid, task_current->pid);
 
     // Change the status of a thread, the idle process will eventually free everything
     thread_current->state = THREAD_ZOMBIE;
+
+    spinlock_irq_release(&scheduler_lock, &irq_flags);
 
     // Give up the CPU
     scheduler_yield();
@@ -178,12 +195,15 @@ void kernel_idle_thread()
 {
     while(1)
     {
-        // Disable interrupts
-        asm volatile ("cli");
+        struct thread *thread_to_delete = NULL;
+        struct vm_address_space *stack_to_clean = NULL;
+
+        // Iteration under spinlock because it's fast
+        uint64_t irq_flags;
+        spinlock_irq_acquire(&scheduler_lock, &irq_flags);
 
         if(task_list != NULL)
         {
-            // Iterate all tasks
             struct task *curr_task = task_list;
             do
             {
@@ -191,59 +211,50 @@ void kernel_idle_thread()
                 {
                     struct thread *prev_thread = curr_task->threads;
                     struct thread *curr_thread = prev_thread->next;
-                    bool task_empty = false;
 
-                    // Iterate all threads
                     do
                     {
                         if(curr_thread->state == THREAD_ZOMBIE)
                         {
-                            log_line(LOG_DEBUG, "%s: Removed TID %lld from PID %lld", __FUNCTION__, curr_thread->tid, curr_task->pid);
-                            
-                            // Special case it's the only thread in the task
                             if(curr_thread == curr_thread->next)
                             {
                                 curr_task->threads = NULL;
-                                task_empty = true;
                             }
-                            else 
+                            else
                             {
-                                // Unlink the thread from the list
                                 prev_thread->next = curr_thread->next;
-
-                                // If it's the head
                                 if(curr_thread == curr_task->threads)
                                 {
                                     curr_task->threads = curr_thread->next;
                                 }
                             }
 
-                            struct thread *thread_to_delete = curr_thread;
-                            curr_thread = curr_thread->next;
-
-                            vmm_free(curr_task->vas, thread_to_delete->context->rsp);
-
-                            kfree(thread_to_delete);
-
-                            if(task_empty) break;
+                            thread_to_delete = curr_thread;
+                            stack_to_clean = curr_task->vas;
+                            break;
                         }
-                        else 
-                        {
-                            prev_thread = curr_thread;
-                            curr_thread = curr_thread->next;
-                        }
-                        
+                        prev_thread = curr_thread;
+                        curr_thread = curr_thread->next;
                     } while(curr_task->threads != NULL && curr_thread != curr_task->threads);
                 }
 
+                if(thread_to_delete) break;
                 curr_task = curr_task->next;
             } while(curr_task != task_list);
         }
 
-        // Reenable interrupts
-        asm volatile ("sti");
+        spinlock_irq_release(&scheduler_lock, &irq_flags);
 
-        asm volatile ("hlt");
+        if(thread_to_delete != NULL)
+        {
+            log_line(LOG_DEBUG, "%s: Reaping TID %lld", __FUNCTION__, thread_to_delete->tid);
+            vmm_free(stack_to_clean, thread_to_delete->context->rsp);
+            kfree(thread_to_delete);
+        }
+        else 
+        {
+            asm volatile ("hlt");
+        }
     }
 }
 
@@ -254,12 +265,13 @@ void kernel_idle_thread()
  */
 void thread_sleep(uint64_t ms)
 {
-    asm volatile ("cli");
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&scheduler_lock, &irq_flags);
 
     thread_current->wake_time = timer_get_uptime_ms() + ms;
     thread_current->state = THREAD_SLEEPING;
 
-    asm volatile ("sti");
+    spinlock_irq_release(&scheduler_lock, &irq_flags);
 
     scheduler_yield();
 }
