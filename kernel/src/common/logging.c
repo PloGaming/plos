@@ -9,6 +9,7 @@
 #include <stddef.h>
 
 static char log_buffer[LOG_BUFFER_DIM];
+struct mutex console_lock = MUTEX_INIT;
 
 char *log_labels[] = {
     "DBG",
@@ -26,6 +27,8 @@ char *log_colors[] = {
 
 void log_line(enum logType logLevel, char *fmt, ...)
 {
+    mutex_acquire(&console_lock);
+
     bool send_to_console = (logLevel != LOG_DEBUG);
     char *ptr = log_buffer;
 
@@ -61,4 +64,5 @@ void log_line(enum logType logLevel, char *fmt, ...)
     if (send_to_console) {
         console_write_str(log_buffer, ptr - log_buffer);
     }
+    mutex_release(&console_lock);
 }

@@ -20,17 +20,41 @@
 #include <limine_requests.h>
 #include <memory/hhdm.h>
 #include <libk/stdio.h>
+#include <scheduling/lock.h>
+
+struct mutex testMutex = MUTEX_INIT;
 
 void thread_a() {
-    log_line(LOG_DEBUG, "%s: Started time: %lld ms", __FUNCTION__, timer_get_uptime_ms());
+    while(1)
+    {
+        mutex_acquire(&testMutex);
+        log_line(LOG_DEBUG, "%s: Started time: %lld ms", __FUNCTION__, timer_get_uptime_ms());
+        mutex_release(&testMutex);
+
+        for(volatile int i = 0; i < 5000000; i++);
+    }
 }
 
 void thread_b() {
-    log_line(LOG_DEBUG, "%s: Started time: %lld ms", __FUNCTION__, timer_get_uptime_ms());
+    while (1) 
+    {
+        mutex_acquire(&testMutex);
+        log_line(LOG_DEBUG, "%s: Started time: %lld ms", __FUNCTION__, timer_get_uptime_ms());
+        mutex_release(&testMutex);
+
+        for(volatile int i = 0; i < 5000000; i++);
+    }
 }
 
 void thread_c() {
-    log_line(LOG_DEBUG, "%s: Started time: %lld ms", __FUNCTION__, timer_get_uptime_ms());
+    while(1)
+    {
+        mutex_acquire(&testMutex);
+        log_line(LOG_DEBUG, "%s: Started time: %lld ms", __FUNCTION__, timer_get_uptime_ms());
+        mutex_release(&testMutex);
+
+        for(volatile int i = 0; i < 5000000; i++);
+    }
 }
 
 // This is our kernel's entry point.

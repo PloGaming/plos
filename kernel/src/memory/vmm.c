@@ -6,6 +6,7 @@
 #include <memory/vmm.h>
 #include <common/logging.h>
 #include <cpu.h>
+#include <scheduling/lock.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -30,6 +31,8 @@ void vmm_init(void)
     }
 
     // Set the base root
+    struct spinlock_irq init_lock = SPINLOCK_IRQ_INIT;
+    kernel_vas->lock = init_lock;
     kernel_vas->pml4_phys = paging_getKernelRoot();
     kernel_vas->region_list = NULL;
 
@@ -60,6 +63,8 @@ struct vm_address_space *vmm_new_address_space(void)
     }
 
     // Set the correct fields
+    struct spinlock_irq init_lock = SPINLOCK_IRQ_INIT;
+    new_address_space->lock = init_lock;
     new_address_space->pml4_phys = (uint64_t *) new_pml4;
     new_address_space->region_list = NULL;
 
@@ -95,6 +100,9 @@ void *vmm_alloc(struct vm_address_space *space, uint64_t size, uint64_t flags, u
 
     if(!space || size == 0) return NULL;
 
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&space->lock, &irq_flags);
+
     // Set the correct search start and end searching address
     uint64_t region_search_start, region_search_end;
     if(space == kernel_vas)
@@ -129,7 +137,11 @@ void *vmm_alloc(struct vm_address_space *space, uint64_t size, uint64_t flags, u
         candidate = current->base + current->size;
 
         // OOM virtual
-        if(candidate >= region_search_end) return NULL;
+        if(candidate >= region_search_end) 
+        {
+            spinlock_irq_release(&space->lock, &irq_flags);
+            return NULL;
+        }
 
         prev = current;
         current = current->next;
@@ -137,7 +149,11 @@ void *vmm_alloc(struct vm_address_space *space, uint64_t size, uint64_t flags, u
 
     // Allocate the new area in the kernel heap
     struct vm_area *new_area = kmalloc(sizeof(struct vm_area));
-    if(!new_area) return NULL;
+    if(!new_area) 
+    {
+        spinlock_irq_release(&space->lock, &irq_flags);
+        return NULL;
+    }
 
     new_area->base = candidate;
     new_area->size = size;
@@ -182,9 +198,11 @@ void *vmm_alloc(struct vm_address_space *space, uint64_t size, uint64_t flags, u
     else 
     {
         log_line(LOG_ERROR, "%s: Invalid user access", __FUNCTION__);
+        spinlock_irq_release(&space->lock, &irq_flags);
         hcf();
     }
 
+    spinlock_irq_release(&space->lock, &irq_flags);
     return (void *) new_area->base;
 }
 
@@ -225,6 +243,9 @@ void vmm_free(struct vm_address_space *space, uint64_t addr)
 {
     if(!space || !addr) return;
 
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&space->lock, &irq_flags);
+
     struct vm_area *current = space->region_list;
     struct vm_area *prev = NULL;
 
@@ -251,6 +272,7 @@ void vmm_free(struct vm_address_space *space, uint64_t addr)
                 !(current->flags & VMM_FLAGS_MMIO)); // Free the physical page only if the mapped area is not MMIO
 
             kfree(current);
+            spinlock_irq_release(&space->lock, &irq_flags);
             return;
         }
 
@@ -258,6 +280,7 @@ void vmm_free(struct vm_address_space *space, uint64_t addr)
         current = current->next;
     }
 
+    spinlock_irq_release(&space->lock, &irq_flags);
     log_line(LOG_WARN, "%s: Attempted to free an invalid region: 0x%llx", __FUNCTION__, addr);
 }
 
@@ -345,6 +368,9 @@ void vmm_page_fault_handler(struct cpu_status *context)
         target_vas = current_vas;
     }
 
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&target_vas->lock, &irq_flags);
+
     struct vm_area *target_area = vmm_get_vm_area(target_vas, cr2);
     
     // The memory was not mapped
@@ -389,6 +415,7 @@ void vmm_page_fault_handler(struct cpu_status *context)
         vmm_generic_to_x86_flags(target_area->flags),
         false);
     
+    spinlock_irq_release(&target_vas->lock, &irq_flags);
     log_line(LOG_DEBUG, "%s: Recovered Fault at 0x%llx -> Alloc Phys 0x%llx", __FUNCTION__,cr2, phys_page);
 }
 

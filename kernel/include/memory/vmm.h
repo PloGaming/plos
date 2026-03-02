@@ -2,6 +2,7 @@
 #define VMM_H
 
 #include <interrupts/isr.h>
+#include <scheduling/lock.h>
 #include <stdint.h>
 
 /**
@@ -51,6 +52,7 @@ struct vm_area {
 struct vm_address_space {
     uint64_t *pml4_phys; ///< The pointer to the pml4 table for this VAS
     struct vm_area *region_list; ///< List of the regions
+    struct spinlock_irq lock; ///< The lock of the address space
 };
 
 void vmm_init(void);

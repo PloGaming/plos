@@ -3,6 +3,7 @@
 #include <memory/gdt/gdt.h>
 #include <memory/pmm.h>
 #include <limine.h>
+#include <scheduling/lock.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -25,6 +26,9 @@ static uint64_t used_pages, totalPages;
 
 // Highest usable RAM Addr
 static uint64_t highestAddr = 0;
+
+// The lock for our pmm, spinlock beacuse it can be called by ISRs
+struct spinlock_irq pmm_lock = SPINLOCK_IRQ_INIT;
 
 /********************** UTILITY FUNCTIONS FOR BUDDY ***********************/
 
@@ -59,10 +63,17 @@ void pmm_free_pages(uint64_t phys, uint32_t order)
         return;
     }
 
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&pmm_lock, &irq_flags);
+
     // Get the page we're referring to
     uint64_t pfn = phys / PMM_PAGE_SIZE;
     struct pmm_page *page = pfn_to_page(pfn);
-    if(!page) return;
+    if(!page) 
+    {
+        spinlock_irq_release(&pmm_lock, &irq_flags);
+        return;
+    }
 
     // Coalescing buddys
     while(order < PMM_MAX_ORDER - 1)
@@ -106,6 +117,10 @@ void pmm_free_pages(uint64_t phys, uint32_t order)
     // Add it to our free areas list
     dll_add_after(&free_areas[order].head, &page->link);
     free_areas[order].nr_free++;
+
+    used_pages -= (1ULL << order);
+
+    spinlock_irq_release(&pmm_lock, &irq_flags);
 }
 
 /**
@@ -120,6 +135,9 @@ uint64_t pmm_alloc_pages(uint32_t order)
 {
     if(order >= PMM_MAX_ORDER) return 0;
 
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&pmm_lock, &irq_flags);
+
     // Search for a page >= order we search for
     uint32_t current_order;
     bool page_found = false;
@@ -133,7 +151,11 @@ uint64_t pmm_alloc_pages(uint32_t order)
         }
     }
 
-    if(!page_found) return 0;
+    if(!page_found)
+    {
+        spinlock_irq_release(&pmm_lock, &irq_flags);
+        return 0;
+    }
 
     // Delete the node since it's not free anymore
     struct double_ll_node *node = free_areas[current_order].head.next;
@@ -167,6 +189,9 @@ uint64_t pmm_alloc_pages(uint32_t order)
     page->ref_count = 1;
     page->order = order;
 
+    used_pages += (1ULL << order);
+    spinlock_irq_release(&pmm_lock, &irq_flags);
+
     return page_to_phys(page);
 }
 
@@ -199,10 +224,7 @@ uint64_t pmm_alloc(uint64_t size)
     uint32_t order = pmm_get_order_from_size(size);
     if(order >= PMM_MAX_ORDER) return 0; // Too big
 
-    uint64_t phys = pmm_alloc_pages(order);
-    if(phys != 0) used_pages += (1ULL << order);
-
-    return phys;
+    return pmm_alloc_pages(order);
 }
 
 /**
@@ -216,8 +238,6 @@ void pmm_free(uint64_t physAddr, uint64_t length)
     uint32_t order = pmm_get_order_from_size(length);
 
     pmm_free_pages(physAddr, order);
-
-    used_pages -= (1ULL << order);
 }
 
 /**
@@ -345,7 +365,6 @@ void pmm_init()
                 // Free the block
                 pmm_free_pages(current_phys, order);
                 
-                used_pages -= (1ULL << order);
                 current_phys += (PMM_PAGE_SIZE * (1ULL << order));
             }
         }
@@ -362,10 +381,15 @@ void pmm_init()
  */
 void pmm_page_inc_ref(uint64_t phys)
 {
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&pmm_lock, &irq_flags);
+
     struct pmm_page *page = phys_to_page(phys);
     
     if(page && (page->flags & PMM_FLAG_USED))
         page->ref_count++;
+
+    spinlock_irq_release(&pmm_lock, &irq_flags);
 }
 
 /**
@@ -376,16 +400,24 @@ void pmm_page_inc_ref(uint64_t phys)
  */
 void pmm_page_dec_ref(uint64_t phys)
 {
+    uint64_t irq_flags;
+    spinlock_irq_acquire(&pmm_lock, &irq_flags);
+
     struct pmm_page *page = phys_to_page(phys);
     if(page && (page->flags & PMM_FLAG_USED))
     {
         page->ref_count--;
         if(page->ref_count == 0)
         {
-            used_pages -= (1ULL << page->order);
+            // We have to release the lock before calling pmm_free_pages to evict deadlock
+            spinlock_irq_release(&pmm_lock, &irq_flags);
+
             pmm_free_pages(phys, page->order);
+            return; // Return immediately after because we already released the spinlock
         }
     }
+
+    spinlock_irq_release(&pmm_lock, &irq_flags);
 }
 
 /**

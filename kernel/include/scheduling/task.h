@@ -2,7 +2,6 @@
 #define TASK_H
 
 #include <interrupts/isr.h>
-#include <memory/vmm.h>
 #include <memory/paging.h>
 #include <stdint.h>
 
@@ -53,6 +52,7 @@ struct thread
     uint64_t wake_time; ///< Used for thread sleeping
 
     struct thread *next; ///< Pointer to the next thread
+    struct thread *next_waiter; ///< Pointer to the next blocked thread
 };
 
 struct task *task_create(const char *name);

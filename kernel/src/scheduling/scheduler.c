@@ -128,7 +128,17 @@ struct cpu_status *scheduler_schedule(struct cpu_status *status)
         // Anti-freeze check
         if(search_task == task_current && search_thread == thread_current)
         {
-            break;
+            // If the thread is ready we put him up
+            if(search_thread->state == THREAD_READY)
+            {
+                break;
+            }
+            // Otherwise we choose the idle thread
+            else 
+            {
+                search_task = task_list;
+                search_thread = search_task->threads;
+            }
         }
     }
 
