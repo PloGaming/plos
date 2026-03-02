@@ -14,6 +14,8 @@
 static uint64_t kheap_start, kheap_end;
 static struct kheap_node *kheap_head;
 
+static struct mutex kheap_lock = MUTEX_INIT;
+
 /**
  * @brief This function will initialize the kernel heap
  * The kernel heap is placed after the kernel, using the remainig space on the VAS
@@ -119,6 +121,8 @@ void* kmalloc(size_t size)
     // Align the size to 16 bytes
     if(size % KHEAP_BLOCK_SIZE) size += KHEAP_BLOCK_SIZE - (size % KHEAP_BLOCK_SIZE);
 
+    mutex_acquire(&kheap_lock);
+
     // We iterate through the nodes
     struct kheap_node *currentNode;
     while(true)
@@ -149,6 +153,7 @@ void* kmalloc(size_t size)
                 }
 
                 currentNode->isFree = false;
+                mutex_release(&kheap_lock);
                 return (void *)(currentNode + 1);
             }
 
@@ -159,9 +164,14 @@ void* kmalloc(size_t size)
         if(!kheap_extend(KHEAP_EXTENDING_AMOUNT))
         {
             // The heap expansion has failed
+            mutex_release(&kheap_lock);
             return NULL;
         }
     }
+
+    mutex_release(&kheap_lock);
+    // Should never come here
+    return NULL;
 }
 
 /**
@@ -171,6 +181,8 @@ void* kmalloc(size_t size)
 void kheap_print_nodes()
 {
     log_line(LOG_DEBUG, "%s: Kernel heap current nodes:", __FUNCTION__);
+
+    mutex_acquire(&kheap_lock);
     struct kheap_node *current = kheap_head;
     while(current)
     {
@@ -181,6 +193,8 @@ void kheap_print_nodes()
             current->size);
         current = current->next;
     }
+
+    mutex_release(&kheap_lock);
 }
 
 /**
@@ -218,12 +232,15 @@ void kfree(void *ptr)
 {
     if(!ptr) return;
 
+    mutex_acquire(&kheap_lock);
+
     // Get the header
     struct kheap_node *node_to_free = (struct kheap_node *)ptr - 1;
     
     // Check for double free
     if(node_to_free->isFree)
     {
+        mutex_release(&kheap_lock);
         log_line(LOG_WARN, "%s: Kernel heap double free detected; virtual addr: 0x%llx", __FUNCTION__, ptr);
         return;
     }
@@ -233,4 +250,6 @@ void kfree(void *ptr)
 
     // Coalesce the blocks to reduce external fragmentation
     kheap_coalesce();
+
+    mutex_release(&kheap_lock);
 }

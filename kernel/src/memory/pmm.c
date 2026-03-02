@@ -28,7 +28,7 @@ static uint64_t used_pages, totalPages;
 static uint64_t highestAddr = 0;
 
 // The lock for our pmm, spinlock beacuse it can be called by ISRs
-struct spinlock_irq pmm_lock = SPINLOCK_IRQ_INIT;
+static struct spinlock_irq pmm_lock = SPINLOCK_IRQ_INIT;
 
 /********************** UTILITY FUNCTIONS FOR BUDDY ***********************/
 
